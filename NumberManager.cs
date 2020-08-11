@@ -171,7 +171,7 @@ namespace NumberManagerMod
             else return null;
         }
 
-        public static void ApplyNumbering( TrainCar car, Dictionary<MeshRenderer, string> defaultTexDict )
+        public static void ApplyNumbering( TrainCar car, Dictionary<MeshRenderer, DefaultTexInfo> defaultTexDict )
         {
             if( !TryGetAssignedSkin(car, out var skin) ) return;
             var numScheme = GetScheme(car.carType, skin.name);
@@ -202,14 +202,20 @@ namespace NumberManagerMod
             modEntry.Logger.Log($"Applying number {carNumber} to {car.ID}");
             SetCarNumber(car.CarGUID, carNumber);
 
-            if( !skin.ContainsTexture(numScheme.TargetTexture) )
-            {
-                modEntry.Logger.Warning($"Couldn't apply number to {car.ID}; skin does not contain target texture for num scheme");
-                return;
-            }
+            //if( !skin.ContainsTexture(numScheme.TargetTexture) )
+            //{
+            //    modEntry.Logger.Warning($"Couldn't apply number to {car.ID}; skin does not contain target texture for num scheme");
+            //    return;
+            //}
 
-            var tgtTex = skin.GetTexture(numScheme.TargetTexture).textureData;
-            var shaderProps = GetShaderProps(numScheme, carNumber, tgtTex.width, tgtTex.height);
+            var tgtTex = skin.GetTexture(numScheme.TargetTexture)?.textureData;
+            NumShaderProps shaderProps = null;
+
+            if( tgtTex != null )
+            {
+                shaderProps = GetShaderProps(numScheme, carNumber, tgtTex.width, tgtTex.height);
+            }
+            // otherwise we'll be lazy and figure out the width/height when we find the default texture
 
             if( CarTypes.IsSteamLocomotive(car.carType) )
             {
@@ -226,11 +232,16 @@ namespace NumberManagerMod
             {
                 if( !renderer.material ) continue;
 
-                string diffuseName = defaultTexDict[renderer];
+                DefaultTexInfo defaultTex = defaultTexDict[renderer];
 
                 // check if this is the target for numbering
-                if( string.Equals(numScheme.TargetTexture, diffuseName) )
+                if( string.Equals(numScheme.TargetTexture, defaultTex.Name) )
                 {
+                    if( shaderProps == null )
+                    {
+                        shaderProps = GetShaderProps(numScheme, carNumber, defaultTex.Width, defaultTex.Height);
+                    }
+
                     renderer.material.shader = NumShader;
                     renderer.material.SetTexture("_FontTex", numScheme.FontTexture);
                     shaderProps.ApplyTo(renderer.material);

@@ -9,17 +9,42 @@ using UnityEngine;
 
 namespace NumberManagerMod
 {
+    public class DefaultTexInfo
+    {
+        public readonly string Name;
+        public readonly int Width;
+        public readonly int Height;
+
+        public DefaultTexInfo( string name, int width, int height )
+        {
+            Name = name;
+            Width = width;
+            Height = height;
+        }
+    }
+
     [HarmonyPatch(typeof(SkinManagerMod.Main), "ReplaceTexture")]
     class SkinManager_ReplaceTexture_Patch
     {
-        static void Prefix( TrainCar trainCar, ref Dictionary<MeshRenderer, string> __state )
+        private static DefaultTexInfo GetDefaultTexInfo( MeshRenderer renderer )
+        {
+            var mainTex = renderer.material.GetTexture("_MainTex");
+
+            if( mainTex != null )
+            {
+                return new DefaultTexInfo(mainTex.name, mainTex.width, mainTex.height);
+            }
+            else return new DefaultTexInfo(null, 0, 0);
+        }
+
+        static void Prefix( TrainCar trainCar, ref Dictionary<MeshRenderer, DefaultTexInfo> __state )
         {
             // Get the default texture names, because the ReplaceTexture method erases them with the new textures
             var renderers = trainCar.gameObject.GetComponentsInChildren<MeshRenderer>();
-            __state = renderers.ToDictionary(mr => mr, mr => mr.material.GetTexture("_MainTex")?.name);
+            __state = renderers.ToDictionary(mr => mr, mr => GetDefaultTexInfo(mr));
         }
 
-        static void Postfix( TrainCar trainCar, Dictionary<MeshRenderer, string> __state )
+        static void Postfix( TrainCar trainCar, Dictionary<MeshRenderer, DefaultTexInfo> __state )
         {
             NumberManager.ApplyNumbering(trainCar, __state);
         }

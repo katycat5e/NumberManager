@@ -114,7 +114,7 @@ namespace NumberManagerMod
             // transform from MainTex uv to FontTex uv
             Vector2 transform = mainSize / new Vector2(scheme.TextureWidth, scheme.TextureHeight);
 
-            return new NumShaderProps(nTotalDigits, digitBounds, digitUV, transform);
+            return new NumShaderProps(nTotalDigits, digitBounds, digitUV, transform, scheme.BlendMode);
         }
     }
 }

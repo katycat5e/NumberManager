@@ -7,6 +7,8 @@
         _MetallicGlossMap( "Metal Occlusion Gloss (RGA)", 2D ) = "white" {}
         _BumpMap( "Bumpmap", 2D ) = "bump" {}
         _EmissionMap( "Emission", 2D ) = "black" {}
+        _FontEmission( "Font Emission", 2D ) = "black" {}
+        _BlendMode( "Blending Mode", Int ) = 0
     }
     SubShader
     {
@@ -25,8 +27,18 @@
         sampler2D_half _MetallicGlossMap;
         sampler2D _BumpMap;
         sampler2D_half _EmissionMap;
+        sampler2D_half _FontEmission;
 
         int _NDigits = 1;
+
+        // Blending modes for fonts
+        int _BlendMode = 0;
+        #define BM_ADD 1
+        #define BM_SUBTRACT 2
+        #define BM_MULTIPY 3
+        #define BM_DIVIDE 4
+        #define BM_COLORIZE 5
+
         // (MainTex UV space) digit boundaries
         float4 _DigitBounds[32];
         // (FontTex uv space) digit src bottom left positions
@@ -49,8 +61,7 @@
 
         void surf (Input IN, inout SurfaceOutputStandard o)
         {
-            // Albedo comes from a texture tinted by color
-            fixed4 c = tex2D( _MainTex, IN.uv_MainTex );
+            fixed4 outCol = tex2D( _MainTex, IN.uv_MainTex );
             half4 s = tex2D( _MetallicGlossMap, IN.uv_MainTex );
             half4 e = tex2D( _EmissionMap, IN.uv_MainTex );
 
@@ -73,15 +84,49 @@
                     // font texture UV
                     fontUV = fontUV + _DigitUV[i];
                     fixed4 fCol = tex2D( _FontTex, fontUV );
+                    half3 fontEmit = GammaToLinearSpace(tex2D( _FontEmission, fontUV ));
 
-                    c = (c * (1 - fCol.a)) + (fCol * fCol.a);
+                    // blend emission based on font alpha
+                    emit = lerp( emit, fontEmit, fCol.a );
+
+                    // alpha-premultiplied overlay color
+                    fixed4 fColP = fixed4(fCol.rgb * fCol.a, fCol.a);
+
+                    switch( _BlendMode )
+                    {
+                    case BM_ADD:
+                        outCol = outCol + fColP;
+                        break;
+
+                    case BM_SUBTRACT:
+                        outCol = outCol - fColP;
+                        break;
+
+                    case BM_MULTIPY:
+                        outCol = outCol * fColP;
+                        break;
+
+                    case BM_DIVIDE:
+                        outCol = outCol / fColP;
+                        break;
+
+                    case BM_COLORIZE:
+                        // convert base texture to grayscale, then add font color
+                        fixed baseGray = dot(outCol.rgb, fixed3(0.2126, 0.7152, 0.0722));
+                        outCol = (outCol * (1 - fCol.a)) + fColP + (baseGray * fCol.a);
+                        break;
+
+                    default:
+                        // normal alpha blending
+                        outCol = (outCol * (1 - fCol.a)) + fColP;
+                        break;
+                    }
 
                     break;
                 }
             }
 
-            o.Albedo = c.rgb;
-
+            o.Albedo = outCol.rgb;
             o.Alpha = 1;
 
             o.Metallic = s.r;

@@ -13,6 +13,9 @@ namespace NumberManagerMod
         [XmlAttribute]
         public string TargetTexture;
 
+        [XmlAttribute]
+        public FontBlendMode BlendMode = FontBlendMode.Normal;
+
         public NumberFont[] Fonts;
 
         //[XmlAttribute]
@@ -63,7 +66,17 @@ namespace NumberManagerMod
             }
 
             return true;
-        }
+        }   
+    }
+
+    public enum FontBlendMode
+    {
+        Normal = 0,
+        Add = 1,
+        Subtract = 2,
+        Multipy = 3,
+        Divide = 4,
+        Colorize = 5
     }
 
     public class NumAttachPoint
