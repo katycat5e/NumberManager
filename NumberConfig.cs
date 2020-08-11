@@ -29,7 +29,6 @@ namespace NumberManagerMod
             return UnityEngine.Random.Range(MinNumber, MaxNumber);
         }
 
-        [XmlElement(ElementName = "Attachment")]
         public NumAttachPoint[] AttachPoints;
 
         // Created on initialization
