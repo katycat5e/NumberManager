@@ -21,6 +21,7 @@ namespace NumberManagerMod
         private static UnityModManager.ModEntry modEntry;
         private static UnityModManager.ModEntry skinManagerEntry;
         private static XmlSerializer serializer;
+        public static NMModSettings Settings { get; private set; }
 
         private static string skinsFolder;
 
@@ -44,6 +45,11 @@ namespace NumberManagerMod
                 modEntry.Logger.Error("Couldn't find Skin Manager, aborting load");
                 return false;
             }
+
+            // Initialize settings
+            Settings = UnityModManager.ModSettings.Load<NMModSettings>(modEntry);
+            modEntry.OnGUI = DrawGUI;
+            modEntry.OnSaveGUI = SaveGUI;
 
             skinsFolder = Path.Combine(skinManagerEntry.Path, "Skins");
 
@@ -135,6 +141,12 @@ namespace NumberManagerMod
 
         #region Number Application
 
+        private static int GetCarIdNumber( string carId )
+        {
+            string idNum = carId.Substring(carId.Length - 3);
+            return int.Parse(idNum);
+        }
+
         private static bool TryGetAssignedSkin( TrainCar car, out SkinManagerMod.Skin skin )
         {
             skin = null;
@@ -166,16 +178,25 @@ namespace NumberManagerMod
 
             if( (numScheme == null) || (NumShader == null) ) return; // nothing to apply
 
-            int carNumber;
+            // Check if car already had a number assigned
+            int carNumber = GetSavedCarNumber(car.logicCar.carGuid);
 
-            // Tender should try to match engine if possible
-            if( CarTypes.IsTender(car.carType) && numScheme.IsValidNumber(LastSteamerNumber) )
+            if( carNumber < 0 )
             {
-                carNumber = LastSteamerNumber;
-            }
-            else
-            {
-                carNumber = numScheme.GetRandomNum();
+                // Previously un-numbered car
+                // A new tender should try to match engine if possible
+                if( CarTypes.IsTender(car.carType) )
+                {
+                    carNumber = LastSteamerNumber;
+                }
+                else
+                {
+                    if( Settings.PreferCarId )
+                    {
+                        carNumber = GetCarIdNumber(car.ID);
+                    }
+                    else carNumber = numScheme.GetRandomNum();
+                }
             }
 
             modEntry.Logger.Log($"Applying number {carNumber} to {car.ID}");
@@ -287,6 +308,20 @@ namespace NumberManagerMod
             numberData.SetJObjectArray("carNumbers", carNumArray);
 
             SaveGameManager.data.SetJObject(SAVE_DATA_KEY, numberData);
+        }
+
+        #endregion
+
+        #region Settings
+
+        static void DrawGUI( UnityModManager.ModEntry entry )
+        {
+            Settings.Draw(entry);
+        }
+
+        static void SaveGUI( UnityModManager.ModEntry entry )
+        {
+            Settings.Save(entry);
         }
 
         #endregion

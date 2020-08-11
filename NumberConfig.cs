@@ -15,11 +15,14 @@ namespace NumberManagerMod
 
         public NumberFont[] Fonts;
 
-        [XmlAttribute]
-        public int MinNumber;
+        //[XmlAttribute]
+        //public int IdNumberingOffset = 0;
 
         [XmlAttribute]
-        public int MaxNumber;
+        public int MinNumber = 1;
+
+        [XmlAttribute]
+        public int MaxNumber = 9999;
 
         public int GetRandomNum()
         {
@@ -62,8 +65,6 @@ namespace NumberManagerMod
 
             return true;
         }
-
-        public bool IsValidNumber( int carNum ) => (carNum >= MinNumber) && (carNum <= MaxNumber);
     }
 
     public class NumAttachPoint
