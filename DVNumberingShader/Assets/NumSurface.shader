@@ -113,7 +113,7 @@
                     case BM_COLORIZE:
                         // convert base texture to grayscale, then add font color
                         fixed baseGray = dot(outCol.rgb, fixed3(0.2126, 0.7152, 0.0722));
-                        outCol = (outCol * (1 - fCol.a)) + fColP + (baseGray * fCol.a);
+                        outCol = (outCol * (1 - fCol.a)) + (fColP * baseGray);
                         break;
 
                     default:

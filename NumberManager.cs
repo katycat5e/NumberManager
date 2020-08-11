@@ -18,7 +18,7 @@ namespace NumberManagerMod
     {
         public const string NUM_CONFIG_FILE = "numbering.xml";
 
-        private static UnityModManager.ModEntry modEntry;
+        internal static UnityModManager.ModEntry modEntry;
         private static UnityModManager.ModEntry skinManagerEntry;
         private static XmlSerializer serializer;
         public static NMModSettings Settings { get; private set; }
@@ -130,9 +130,22 @@ namespace NumberManagerMod
             if( config != null )
             {
                 string dir = Path.GetDirectoryName(configPath);
-                if( config.Initialize(dir) )
+
+                try
                 {
-                    NumberSchemes.Add(new SchemeKey(carType, skinName), config);
+                    if( config.Initialize(dir) )
+                    {
+                        NumberSchemes.Add(new SchemeKey(carType, skinName), config);
+                    }
+                    else
+                    {
+                        // that's a warnin
+                        modEntry.Logger.Warning($"Issue encountered with numbering config for {skinName}");
+                    }
+                }
+                catch( Exception ex )
+                {
+                    modEntry.Logger.Error($"Exception when loading numbering config for {skinName}:\n{ex.Message}");
                 }
             }
         }
@@ -202,12 +215,7 @@ namespace NumberManagerMod
             modEntry.Logger.Log($"Applying number {carNumber} to {car.ID}");
             SetCarNumber(car.CarGUID, carNumber);
 
-            //if( !skin.ContainsTexture(numScheme.TargetTexture) )
-            //{
-            //    modEntry.Logger.Warning($"Couldn't apply number to {car.ID}; skin does not contain target texture for num scheme");
-            //    return;
-            //}
-
+            // Check if the texture we're targeting is supplied by the skin
             var tgtTex = skin.GetTexture(numScheme.TargetTexture)?.textureData;
             NumShaderProps shaderProps = null;
 
@@ -244,6 +252,12 @@ namespace NumberManagerMod
 
                     renderer.material.shader = NumShader;
                     renderer.material.SetTexture("_FontTex", numScheme.FontTexture);
+
+                    if( numScheme.EmissionTexture != null )
+                    {
+                        renderer.material.SetTexture("_FontEmission", numScheme.EmissionTexture);
+                    }
+
                     shaderProps.ApplyTo(renderer.material);
                 }
             }

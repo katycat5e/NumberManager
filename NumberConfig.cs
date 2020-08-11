@@ -9,6 +9,7 @@ namespace NumberManagerMod
     public class NumberConfig
     {
         private const string FONT_TEX_FILE = "num.png";
+        private const string FONT_EMIT_FILE = "num_e.png";
 
         [XmlAttribute]
         public string TargetTexture;
@@ -17,9 +18,6 @@ namespace NumberManagerMod
         public FontBlendMode BlendMode = FontBlendMode.Normal;
 
         public NumberFont[] Fonts;
-
-        //[XmlAttribute]
-        //public int IdNumberingOffset = 0;
 
         [XmlAttribute]
         public int MinNumber = 1;
@@ -39,6 +37,9 @@ namespace NumberManagerMod
         public Texture2D FontTexture = null;
 
         [XmlIgnore]
+        public Texture2D EmissionTexture = null;
+
+        [XmlIgnore]
         public int TextureWidth = 0;
 
         [XmlIgnore]
@@ -47,25 +48,49 @@ namespace NumberManagerMod
 
         public bool Initialize( string dirPath )
         {
-            try
+            bool allGood = true;
+
+            string fontPath = Path.Combine(dirPath, FONT_TEX_FILE);
+            var imgData = File.ReadAllBytes(fontPath);
+
+            var texture = new Texture2D(2, 2); // temporary smol image
+            texture.LoadImage(imgData);
+
+            FontTexture = texture;
+            TextureWidth = texture.width;
+            TextureHeight = texture.height;
+
+            // Attempt to load emission map
+            string emitPath = Path.Combine(dirPath, FONT_EMIT_FILE);
+            if( File.Exists(emitPath) )
             {
-                string fontPath = Path.Combine(dirPath, FONT_TEX_FILE);
-                var imgData = File.ReadAllBytes(fontPath);
+                try
+                {
+                    imgData = File.ReadAllBytes(emitPath);
 
-                var texture = new Texture2D(2, 2); // temporary smol image
-                texture.LoadImage(imgData);
+                    texture = new Texture2D(2, 2);
+                    texture.LoadImage(imgData);
 
-                FontTexture = texture;
-                TextureWidth = texture.width;
-                TextureHeight = texture.height;
+                    if( (texture.width != TextureWidth) || (texture.height != TextureHeight) )
+                    {
+                        // emission map needs to be the same size as the diffuse
+                        NumberManager.modEntry.Logger.Warning($"Font emission map size must match diffuse texture, emission will not be loaded");
+                        allGood = false;
+                    }
+                    else
+                    {
+                        EmissionTexture = texture;
+                    }
+                }
+                catch( Exception ex )
+                {
+                    NumberManager.modEntry.Logger.Warning($"Failed to load numbering emission map: {ex.Message}");
+                    EmissionTexture = null;
+                    allGood = false;
+                }
             }
-            catch( Exception ex )
-            {
-                Debug.LogError($"Couldn't load numbering font: {ex.Message}");
-                return false;
-            }
 
-            return true;
+            return allGood;
         }   
     }
 
