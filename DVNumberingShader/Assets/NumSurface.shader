@@ -4,7 +4,8 @@
     {
         _MainTex( "Albedo (RGB)", 2D ) = "white" {}
         _FontTex( "Number Font (RGB)", 2D ) = "white" {}
-        _MetallicGlossMap( "Metal Occlusion Gloss (RGA)", 2D ) = "white" {}
+        _MetallicGlossMap( "Metal Occlusion Gloss (RGA)", 2D ) = "black" {}
+        _FontMetalGloss( "Font Metal Gloss (RA)", 2D ) = "black" {}
         _BumpMap( "Bumpmap", 2D ) = "bump" {}
         _EmissionMap( "Emission", 2D ) = "black" {}
         _FontEmission( "Font Emission", 2D ) = "black" {}
@@ -22,12 +23,18 @@
         // Use shader model 3.0 target, to get nicer looking lighting
         #pragma target 3.0
 
+        #define MAX_DIGITS 32
+
         sampler2D _MainTex;
         sampler2D _FontTex;
         sampler2D_half _MetallicGlossMap;
         sampler2D _BumpMap;
         sampler2D_half _EmissionMap;
-        sampler2D_half _FontEmission;
+
+        half4 _FontSpecular[MAX_DIGITS];
+        half4 _FontEmission[MAX_DIGITS];
+        fixed _UseFSpec[MAX_DIGITS];
+        fixed _UseFEmit[MAX_DIGITS];
 
         int _NDigits = 1;
 
@@ -40,9 +47,9 @@
         #define BM_COLORIZE 5
 
         // (MainTex UV space) digit boundaries
-        float4 _DigitBounds[32];
+        float4 _DigitBounds[MAX_DIGITS];
         // (FontTex uv space) digit src bottom left positions
-        float2 _DigitUV[32];
+        float2 _DigitUV[MAX_DIGITS];
 
         float2 _FontTransform;
 
@@ -62,13 +69,12 @@
         void surf (Input IN, inout SurfaceOutputStandard o)
         {
             fixed4 outCol = tex2D( _MainTex, IN.uv_MainTex );
-            half4 s = tex2D( _MetallicGlossMap, IN.uv_MainTex );
-            half4 e = tex2D( _EmissionMap, IN.uv_MainTex );
+            half4 spec = tex2D( _MetallicGlossMap, IN.uv_MainTex );
+            half3 emit = GammaToLinearSpace( tex2D( _EmissionMap, IN.uv_MainTex ) );
 
-            s = half4(GammaToLinearSpace( s ), s.a);
-            half3 emit = GammaToLinearSpace( e );
+            spec = half4(GammaToLinearSpace( spec ), spec.a);
 
-            [unroll( 32 )]
+            [unroll( MAX_DIGITS )]
             for( int i = 0; i < _NDigits; i++ )
             {
                 // vector (bottomLeft -> input.uv, topRight -> input.uv)
@@ -84,10 +90,14 @@
                     // font texture UV
                     fontUV = fontUV + _DigitUV[i];
                     fixed4 fCol = tex2D( _FontTex, fontUV );
-                    half3 fontEmit = GammaToLinearSpace(tex2D( _FontEmission, fontUV ));
 
-                    // blend emission based on font alpha
-                    emit = lerp( emit, fontEmit, fCol.a );
+                    // blend emission & metal/gloss based on diffuse alpha
+                    if( _UseFEmit[i] ) emit = lerp( emit, _FontEmission[i].rgb, fCol.a );      // half3
+                    if( _UseFSpec[i] )
+                    {
+                        half4 sTemp = lerp( spec, _FontSpecular[i], fCol.a );
+                        spec = half4(sTemp.r, spec.g, 0, sTemp.a); // use base ao, ignore blue
+                    }
 
                     // alpha-premultiplied overlay color
                     fixed4 fColP = fixed4(fCol.rgb * fCol.a, fCol.a);
@@ -129,9 +139,9 @@
             o.Albedo = outCol.rgb;
             o.Alpha = 1;
 
-            o.Metallic = s.r;
-            o.Occlusion = s.g;
-            o.Smoothness = s.a;
+            o.Metallic = spec.r;
+            o.Occlusion = spec.g;
+            o.Smoothness = spec.a;
             o.Emission = emit;
 
             o.Normal = UnpackNormal( tex2D( _BumpMap, IN.uv_BumpMap ) );

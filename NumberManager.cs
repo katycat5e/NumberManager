@@ -133,15 +133,8 @@ namespace NumberManagerMod
 
                 try
                 {
-                    if( config.Initialize(dir) )
-                    {
-                        NumberSchemes.Add(new SchemeKey(carType, skinName), config);
-                    }
-                    else
-                    {
-                        // that's a warnin
-                        modEntry.Logger.Warning($"Issue encountered with numbering config for {skinName}");
-                    }
+                    config.Initialize(dir);
+                    NumberSchemes.Add(new SchemeKey(carType, skinName), config);
                 }
                 catch( Exception ex )
                 {
@@ -252,11 +245,6 @@ namespace NumberManagerMod
 
                     renderer.material.shader = NumShader;
                     renderer.material.SetTexture("_FontTex", numScheme.FontTexture);
-
-                    if( numScheme.EmissionTexture != null )
-                    {
-                        renderer.material.SetTexture("_FontEmission", numScheme.EmissionTexture);
-                    }
 
                     shaderProps.ApplyTo(renderer.material);
                 }

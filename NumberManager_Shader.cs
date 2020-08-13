@@ -1,8 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using UnityEngine;
 
 namespace NumberManagerMod
@@ -50,6 +47,11 @@ namespace NumberManagerMod
             Vector4[] digitBounds = new Vector4[MAX_DIGITS];
             Vector4[] digitUV = new Vector4[MAX_DIGITS];
 
+            Vector4[] emission = new Vector4[MAX_DIGITS];
+            Vector4[] specular = new Vector4[MAX_DIGITS];
+            bool[] useEmit = new bool[MAX_DIGITS];
+            bool[] useSpec = new bool[MAX_DIGITS];
+
             int nTotalDigits = 0;
             int digitIdx = 0;
 
@@ -71,7 +73,8 @@ namespace NumberManagerMod
                 }
                 nTotalDigits += digits.Length;
 
-                int numberWidth = digits.Select(d => font.CharWidth[d]).Sum(); // in pixels
+                // sum of char widths + (kerning * (nDigits - 1))
+                int numberWidth = digits.Select(d => font.CharWidthArr[d] + font.Kerning).Sum() - font.Kerning; // in pixels
 
                 int mainStart, mainEnd, transStart, transEnd;
 
@@ -91,7 +94,8 @@ namespace NumberManagerMod
                 // digit widths as MainTex uv distance
                 foreach( int d in digits )
                 {
-                    mainEnd = mainStart + font.CharWidth[d];
+                    mainEnd = mainStart + font.CharWidthArr[d];
+                    int nextMain = mainEnd + font.Kerning;
 
                     if( font.Orientation == NumOrientation.Horizontal )
                     {
@@ -104,9 +108,26 @@ namespace NumberManagerMod
                         digitBounds[digitIdx] = GetUVBounds(transStart, mainStart, transEnd, mainEnd, mainSize);
                     }
 
-                    digitUV[digitIdx] = GetDigitUV(font.CharX[d], font.CharY[d], fontTexSize);
+                    digitUV[digitIdx] = GetDigitUV(font.CharXArr[d], font.CharYArr[d], fontTexSize);
 
-                    mainStart = mainEnd;
+                    // Emission setup per font
+                    if( font.EmissionColor.HasValue )
+                    {
+                        emission[digitIdx] = font.EmissionColor.Value;
+                        useEmit[digitIdx] = true;
+                    }
+                    else useEmit[digitIdx] = false;
+
+                    // Specular setup per font
+                    if( font.SpecularColor.HasValue )
+                    {
+                        specular[digitIdx] = font.SpecularColor.Value;
+                        useSpec[digitIdx] = true;
+                    }
+                    else useSpec[digitIdx] = false;
+
+
+                    mainStart = nextMain;
                     digitIdx += 1;
                 }
             }
@@ -114,7 +135,18 @@ namespace NumberManagerMod
             // transform from MainTex uv to FontTex uv
             Vector2 transform = mainSize / new Vector2(scheme.TextureWidth, scheme.TextureHeight);
 
-            return new NumShaderProps(nTotalDigits, digitBounds, digitUV, transform, scheme.BlendMode);
+            return new NumShaderProps()
+            {
+                NDigits = nTotalDigits,
+                DigitBounds = digitBounds,
+                DigitUV = digitUV,
+                FontTransform = transform,
+                BlendMode = scheme.BlendMode,
+                Emission = emission,
+                UseEmission = useEmit,
+                Specular = specular,
+                UseSpecular = useSpec
+            };
         }
     }
 }

@@ -9,7 +9,6 @@ namespace NumberManagerMod
     public class NumberConfig
     {
         private const string FONT_TEX_FILE = "num.png";
-        private const string FONT_EMIT_FILE = "num_e.png";
 
         [XmlAttribute]
         public string TargetTexture;
@@ -37,19 +36,14 @@ namespace NumberManagerMod
         public Texture2D FontTexture = null;
 
         [XmlIgnore]
-        public Texture2D EmissionTexture = null;
-
-        [XmlIgnore]
         public int TextureWidth = 0;
 
         [XmlIgnore]
         public int TextureHeight = 0;
 
 
-        public bool Initialize( string dirPath )
+        public void Initialize( string dirPath )
         {
-            bool allGood = true;
-
             string fontPath = Path.Combine(dirPath, FONT_TEX_FILE);
             var imgData = File.ReadAllBytes(fontPath);
 
@@ -60,37 +54,10 @@ namespace NumberManagerMod
             TextureWidth = texture.width;
             TextureHeight = texture.height;
 
-            // Attempt to load emission map
-            string emitPath = Path.Combine(dirPath, FONT_EMIT_FILE);
-            if( File.Exists(emitPath) )
+            foreach( var f in Fonts )
             {
-                try
-                {
-                    imgData = File.ReadAllBytes(emitPath);
-
-                    texture = new Texture2D(2, 2);
-                    texture.LoadImage(imgData);
-
-                    if( (texture.width != TextureWidth) || (texture.height != TextureHeight) )
-                    {
-                        // emission map needs to be the same size as the diffuse
-                        NumberManager.modEntry.Logger.Warning($"Font emission map size must match diffuse texture, emission will not be loaded");
-                        allGood = false;
-                    }
-                    else
-                    {
-                        EmissionTexture = texture;
-                    }
-                }
-                catch( Exception ex )
-                {
-                    NumberManager.modEntry.Logger.Warning($"Failed to load numbering emission map: {ex.Message}");
-                    EmissionTexture = null;
-                    allGood = false;
-                }
+                f.Initialize();
             }
-
-            return allGood;
         }   
     }
 
@@ -124,8 +91,13 @@ namespace NumberManagerMod
         [XmlAttribute]
         public NumOrientation Orientation = NumOrientation.Horizontal;
 
+        [XmlAttribute]
+        public int Kerning;
+
         private int[] ParseIntArray( string s, string dbgName )
         {
+            if( s == null ) throw new ArgumentException($"{dbgName} attribute cannot be null");
+
             try
             {
                 int[] arr = s.Split(',')
@@ -136,49 +108,71 @@ namespace NumberManagerMod
             }
             catch( Exception ex ) when( ex is ArgumentException || ex is FormatException || ex is OverflowException )
             {
-                Debug.LogError($"Invalid {dbgName} integer list \"{s}\"");
+                throw new ArgumentException($"{dbgName} attribute is invalid integer list", ex);
             }
-            return null;
+        }
+
+        private Color? ParseColor( string s, string dbgName )
+        {
+            if( s == null ) return null;
+            float[] parts;
+
+            try
+            {
+                parts = s.Split(',').Select(f => float.Parse(f)).ToArray();
+            }
+            catch( Exception ex )
+            {
+                throw new ArgumentException($"{dbgName} attribute is invalid color", ex);
+            }
+
+            if( parts.Length == 4 )
+            {
+                return new Color(parts[0], parts[1], parts[2], parts[3]);
+            }
+            else if( parts.Length == 3 )
+            {
+                return new Color(parts[0], parts[1], parts[2]);
+            }
+            else throw new ArgumentException($"{dbgName} attribute is invalid color, must have 3 or 4 components");
         }
 
         // Comma-delineated list of int
         [XmlAttribute(AttributeName = "CharWidth")]
         public string CharWidthString;
 
-        private int[] _cWidths = null;
-        public int[] CharWidth
-        {
-            get
-            {
-                if( _cWidths == null ) _cWidths = ParseIntArray(CharWidthString, nameof(CharWidth));
-                return _cWidths;
-            }
-        }
+        [XmlIgnore]
+        public int[] CharWidthArr { get; private set; }
 
         [XmlAttribute(AttributeName = "CharX")]
-        public string CharXString;
+        public string CharXString = null;
 
-        private int[] _cX;
-        public int[] CharX
-        {
-            get
-            {
-                if( _cX == null ) _cX = ParseIntArray(CharXString, nameof(CharX));
-                return _cX;
-            }
-        }
+        [XmlIgnore]
+        public int[] CharXArr { get; private set; }
 
         [XmlAttribute(AttributeName = "CharY")]
         public string CharYString;
 
-        private int[] _cY;
-        public int[] CharY
+        [XmlIgnore]
+        public int[] CharYArr { get; private set; }
+
+        // Emission & Specular colors
+        [XmlAttribute(AttributeName = "Emission")]
+        public string EmissionString = null;
+        public Color? EmissionColor = null;
+
+        [XmlAttribute(AttributeName = "Specular")]
+        public string SpecularString = null;
+        public Color? SpecularColor = null;
+
+        public void Initialize()
         {
-            get
-            {
-                if( _cY == null ) _cY = ParseIntArray(CharYString, nameof(CharY));
-                return _cY;
-            }
+            CharWidthArr = ParseIntArray(CharWidthString, "CharWidth");
+            CharXArr = ParseIntArray(CharXString, "CharX");
+            CharYArr = ParseIntArray(CharYString, "CharY");
+
+            EmissionColor = ParseColor(EmissionString, "Emission");
+            SpecularColor = ParseColor(SpecularString, "Specular");
         }
     }
 

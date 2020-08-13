@@ -1,23 +1,19 @@
-﻿using UnityEngine;
+﻿using System.Linq;
+using UnityEngine;
 
 namespace NumberManagerMod
 {
     public class NumShaderProps
     {
-        public readonly int NDigits;
-        public readonly Vector4[] DigitBounds;
-        public readonly Vector4[] DigitUV;
-        public readonly Vector2 FontTransform;
-        public readonly FontBlendMode BlendMode;
-
-        public NumShaderProps( int nDigits, Vector4[] bounds, Vector4[] uvs, Vector2 transform, FontBlendMode blendMode )
-        {
-            NDigits = nDigits;
-            DigitBounds = bounds;
-            DigitUV = uvs;
-            FontTransform = transform;
-            BlendMode = blendMode;
-        }
+        public int NDigits;
+        public Vector4[] DigitBounds;
+        public Vector4[] DigitUV;
+        public Vector2 FontTransform;
+        public FontBlendMode BlendMode;
+        public Vector4[] Emission;
+        public bool[] UseEmission;
+        public Vector4[] Specular;
+        public bool[] UseSpecular;
 
         public void ApplyTo( Material target )
         {
@@ -26,6 +22,10 @@ namespace NumberManagerMod
             target.SetVectorArray("_DigitUV", DigitUV);
             target.SetVector("_FontTransform", FontTransform);
             target.SetInt("_BlendMode", (int)BlendMode);
+            target.SetVectorArray("_FontEmission", Emission);
+            target.SetFloatArray("_UseFEmit", UseEmission.Select(b => b ? 1f : 0f).ToArray());
+            target.SetVectorArray("_FontSpecular", Specular);
+            target.SetFloatArray("_UseFSpec", UseSpecular.Select(b => b ? 1f : 0f).ToArray());
         }
     }
 }
