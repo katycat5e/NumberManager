@@ -2,7 +2,7 @@
 {
     Properties
     {
-        _MainTex( "Albedo (RGB)", 2D ) = "white" {}
+        _MainTex( "Main Texture", 2D ) = "white" {}
         _FontTex( "Number Font (RGB)", 2D ) = "white" {}
         _MetallicGlossMap( "Metal Occlusion Gloss (RGA)", 2D ) = "black" {}
         _FontMetalGloss( "Font Metal Gloss (RA)", 2D ) = "black" {}

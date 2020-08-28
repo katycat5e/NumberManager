@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Xml.Serialization;
@@ -24,9 +26,64 @@ namespace NumberManagerMod
         [XmlAttribute]
         public int MaxNumber = 9999;
 
+        [XmlAttribute]
+        public bool ForceRandom = false;
+
+        [XmlIgnore]
+        private int[] Sequence = null;
+        [XmlIgnore]
+        private int SequenceIdx = 0;
+
+        private struct NumRange
+        {
+            public readonly int Min;
+            public readonly int Max;
+
+            public NumRange( int min, int max )
+            {
+                Min = min;
+                Max = max;
+            }
+        }
+
+        private static Dictionary<NumRange, int[]> SequenceCache = new Dictionary<NumRange, int[]>();
+
+        private void CreateShuffledOrder()
+        {
+            var range = new NumRange(MinNumber, MaxNumber);
+            if( SequenceCache.TryGetValue(range, out Sequence) )
+            {
+                return;
+            }
+
+            Sequence = Enumerable.Range(MinNumber, MaxNumber - MinNumber + 1).ToArray();
+
+            // Fisher-Yates shuffle
+            var rand = new System.Random();
+
+            // for i from 0 to n-2
+            for( int i = 0; i < Sequence.Length - 1; i++ )
+            {
+                // arr[i] <-> arr[j]
+                int j = rand.Next(0, i);
+                int tmp = Sequence[i];
+                Sequence[i] = Sequence[j];
+                Sequence[j] = tmp;
+            }
+
+            SequenceCache[range] = Sequence;
+        }
+
         public int GetRandomNum()
         {
-            return UnityEngine.Random.Range(MinNumber, MaxNumber);
+            if( Sequence == null ) CreateShuffledOrder();
+
+            int result = Sequence[SequenceIdx];
+
+            SequenceIdx += 1;
+            if( SequenceIdx >= Sequence.Length ) SequenceIdx = 0;
+
+            return result;
         }
 
         public NumAttachPoint[] AttachPoints;

@@ -11,6 +11,8 @@ namespace NumberManagerMod
         // Split the given integer into its decimal digits
         private static int[] GetDigits( int number )
         {
+            if( number == 0 ) return new int [] { 0 };
+
             var digits = new List<int>();
             while( number > 0 )
             {

@@ -197,7 +197,7 @@ namespace NumberManagerMod
                 }
                 else
                 {
-                    if( Settings.PreferCarId )
+                    if( Settings.PreferCarId && !numScheme.ForceRandom )
                     {
                         carNumber = GetCarIdNumber(car.ID);
                     }

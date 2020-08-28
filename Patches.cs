@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace NumberManagerMod
 {
-    public class DefaultTexInfo
+    public struct DefaultTexInfo
     {
         public readonly string Name;
         public readonly int Width;
@@ -28,9 +28,9 @@ namespace NumberManagerMod
     {
         private static DefaultTexInfo GetDefaultTexInfo( MeshRenderer renderer )
         {
-            var mainTex = renderer.material.GetTexture("_MainTex");
+            //var mainTex = renderer.material.GetTexture("_MainTex");
 
-            if( mainTex != null )
+            if( renderer.material.HasProperty("_MainTex") && (renderer.material.GetTexture("_MainTex") is Texture mainTex) )
             {
                 return new DefaultTexInfo(mainTex.name, mainTex.width, mainTex.height);
             }
