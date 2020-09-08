@@ -55,7 +55,7 @@ namespace NumberManagerMod
     {
         static void Prefix( SaveGameManager __instance )
         {
-
+            NumberManager.SaveData();
         }
     }
 
