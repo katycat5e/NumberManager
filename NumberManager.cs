@@ -31,6 +31,8 @@ namespace NumberManagerMod
         public static Shader NumShader { get; private set; } = null;
         public static int LastSteamerNumber { get; private set; } = -1;
 
+        private static Shader DefaultShader = null;
+
         #region Initialization
 
         // Mod entry point
@@ -79,6 +81,12 @@ namespace NumberManagerMod
             }
 
             LoadSchemes();
+
+            DefaultShader = Shader.Find("Standard");
+            if( DefaultShader == null )
+            {
+                modEntry.Logger.Error("Failed to find standard shader");
+            }
 
             var harmony = HarmonyInstance.Create("cc.foxden.number_manager");
             harmony.PatchAll(System.Reflection.Assembly.GetExecutingAssembly());
@@ -182,7 +190,19 @@ namespace NumberManagerMod
             if( !TryGetAssignedSkin(car, out var skin) ) return;
             var numScheme = GetScheme(car.carType, skin.name);
 
-            if( (numScheme == null) || (NumShader == null) ) return; // nothing to apply
+            if( (numScheme == null) || (NumShader == null) )
+            {
+                // nothing to apply
+                foreach( var renderer in car.gameObject.GetComponentsInChildren<MeshRenderer>() )
+                {
+                    if( !renderer.material ) continue;
+                    if( DefaultShader != null )
+                    {
+                        renderer.material.shader = DefaultShader;
+                    }
+                }
+                return;
+            }
 
             // Check if car already had a number assigned
             int carNumber = GetSavedCarNumber(car.logicCar.carGuid);
