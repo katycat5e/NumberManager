@@ -31,7 +31,8 @@ namespace NumberManagerMod
         public static Shader NumShader { get; private set; } = null;
         public static int LastSteamerNumber { get; private set; } = -1;
 
-        private static Shader DefaultShader = null;
+        private static readonly Dictionary<TrainCarType, Dictionary<string, Shader>> DefaultShaders = 
+            new Dictionary<TrainCarType, Dictionary<string, Shader>>();
 
         #region Initialization
 
@@ -82,12 +83,6 @@ namespace NumberManagerMod
 
             LoadSchemes();
 
-            DefaultShader = Shader.Find("Standard");
-            if( DefaultShader == null )
-            {
-                modEntry.Logger.Error("Failed to find standard shader");
-            }
-
             var harmony = HarmonyInstance.Create("cc.foxden.number_manager");
             harmony.PatchAll(System.Reflection.Assembly.GetExecutingAssembly());
 
@@ -105,20 +100,44 @@ namespace NumberManagerMod
 
                 if( Directory.Exists(carTypeDir) )
                 {
+                    var shaderDict = new Dictionary<string, Shader>();
+                    DefaultShaders.Add(prefab.Key, shaderDict);
+
                     foreach( string skinDir in Directory.GetDirectories(carTypeDir) )
                     {
                         string configFile = Path.Combine(skinDir, NUM_CONFIG_FILE);
+                        NumberConfig config = null;
 
                         if( File.Exists(configFile) )
                         {
-                            LoadConfig(prefab.Key, Path.GetFileName(skinDir), configFile);
+                            config = LoadConfig(prefab.Key, Path.GetFileName(skinDir), configFile);
+                        }
+
+                        if( config != null )
+                        {
+                            // get default shader for targeted material
+                            var carPrefabObj = CarTypes.GetCarPrefab(prefab.Key);
+
+                            if( carPrefabObj != null )
+                            {
+                                foreach( MeshRenderer renderer in carPrefabObj.GetComponentsInChildren<MeshRenderer>() )
+                                {
+                                    if( renderer.material.HasProperty("_MainTex") && (renderer.material.GetTexture("_MainTex") is Texture2D mainTex) )
+                                    {
+                                        if( string.Equals(mainTex.name, config.TargetTexture) && !shaderDict.ContainsKey(mainTex.name) )
+                                        {
+                                            shaderDict.Add(mainTex.name, renderer.material.shader);
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
         }
 
-        public static void LoadConfig( TrainCarType carType, string skinName, string configPath )
+        public static NumberConfig LoadConfig( TrainCarType carType, string skinName, string configPath )
         {
             NumberConfig config = null;
 
@@ -132,7 +151,7 @@ namespace NumberManagerMod
             catch( Exception ex )
             {
                 modEntry.Logger.Warning($"Error loading numbering config in \"{configPath}\": {ex.Message}");
-                return;
+                return null;
             }
 
             if( config != null )
@@ -149,6 +168,8 @@ namespace NumberManagerMod
                     modEntry.Logger.Error($"Exception when loading numbering config for {skinName}:\n{ex.Message}");
                 }
             }
+
+            return config;
         }
 
         #endregion
@@ -185,7 +206,7 @@ namespace NumberManagerMod
             else return null;
         }
 
-        public static void ApplyNumbering( TrainCar car, Dictionary<MeshRenderer, DefaultTexInfo> defaultTexDict )
+        public static void ApplyNumbering( TrainCar car, Dictionary<MeshRenderer, DefaultTexInfo> defaultTexDict, string prevSkin = null )
         {
             if( !TryGetAssignedSkin(car, out var skin) ) return;
             var numScheme = GetScheme(car.carType, skin.name);
@@ -195,10 +216,14 @@ namespace NumberManagerMod
                 // nothing to apply
                 foreach( var renderer in car.gameObject.GetComponentsInChildren<MeshRenderer>() )
                 {
-                    if( !renderer.material ) continue;
-                    if( DefaultShader != null )
+                    if( !renderer.material.HasProperty("_MainTex") ) continue;
+
+                    string texName = renderer.material.GetTexture("_MainTex")?.name;
+                    if( !string.IsNullOrEmpty(texName) &&
+                        DefaultShaders.TryGetValue(car.carType, out var shaderDict) &&
+                        shaderDict.TryGetValue(texName, out Shader defShader) )
                     {
-                        renderer.material.shader = DefaultShader;
+                        renderer.material.shader = defShader;
                     }
                 }
                 return;
