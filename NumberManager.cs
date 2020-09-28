@@ -206,6 +206,13 @@ namespace NumberManagerMod
             else return null;
         }
 
+        public static void ApplyNumbering( TrainCar car )
+        {
+            Dictionary<MeshRenderer, DefaultTexInfo> texDict = null;
+            SkinManager_ReplaceTexture_Patch.Prefix(car, ref texDict);
+            ApplyNumbering(car, texDict);
+        }
+
         public static void ApplyNumbering( TrainCar car, Dictionary<MeshRenderer, DefaultTexInfo> defaultTexDict, string prevSkin = null )
         {
             if( !TryGetAssignedSkin(car, out var skin) ) return;

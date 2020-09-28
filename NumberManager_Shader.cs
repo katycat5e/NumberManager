@@ -9,15 +9,18 @@ namespace NumberManagerMod
         private const int MAX_DIGITS = 32;
 
         // Split the given integer into its decimal digits
-        private static int[] GetDigits( int number )
+        public static int[] GetDigits( int number, int padToLength = 1 )
         {
-            if( number == 0 ) return new int [] { 0 };
-
             var digits = new List<int>();
-            while( number > 0 )
+
+            while( (digits.Count < padToLength) || (number > 0) )
             {
-                digits.Add(number % 10);
-                number /= 10;
+                if( number > 0 )
+                {
+                    digits.Add(number % 10);
+                    number /= 10;
+                }
+                else digits.Add(0);
             }
 
             return digits.Reverse<int>().ToArray();

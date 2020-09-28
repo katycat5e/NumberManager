@@ -37,7 +37,7 @@ namespace NumberManagerMod
             else return new DefaultTexInfo(null, 0, 0);
         }
 
-        static void Prefix( TrainCar trainCar, ref Dictionary<MeshRenderer, DefaultTexInfo> __state )
+        internal static void Prefix( TrainCar trainCar, ref Dictionary<MeshRenderer, DefaultTexInfo> __state )
         {
             // Get the default texture names, because the ReplaceTexture method erases them with the new textures
             var renderers = trainCar.gameObject.GetComponentsInChildren<MeshRenderer>();
