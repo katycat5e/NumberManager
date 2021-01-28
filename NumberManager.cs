@@ -1,5 +1,5 @@
 ﻿using DV.JObjectExtstensions;
-using Harmony12;
+using HarmonyLib;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
@@ -28,6 +28,8 @@ namespace NumberManagerMod
         public static readonly Dictionary<SchemeKey, NumberConfig> NumberSchemes = new Dictionary<SchemeKey, NumberConfig>();
         public static readonly Dictionary<string, int> SavedCarNumbers = new Dictionary<string, int>();
 
+        private static byte[] NumberingBundleData = null;
+        private static AssetBundle NumberingBundle = null;
         public static Shader NumShader { get; private set; } = null;
         public static int LastSteamerNumber { get; private set; } = -1;
 
@@ -63,16 +65,20 @@ namespace NumberManagerMod
             string shaderBundlePath = Path.Combine(modEntry.Path, "numbering");
             modEntry.Logger.Log($"Attempting to load numbering shader from \"{shaderBundlePath}\"");
 
-            var bytes = File.ReadAllBytes(shaderBundlePath);
-            var bundle = AssetBundle.LoadFromMemory(bytes);
+            NumberingBundleData = File.ReadAllBytes(shaderBundlePath);
+            NumberingBundle = AssetBundle.LoadFromMemory(NumberingBundleData);
 
-            if( bundle != null )
+            if( NumberingBundle != null )
             {
-                NumShader = bundle.LoadAsset<Shader>("Assets/NumSurface.shader");
+                NumShader = NumberingBundle.LoadAsset<Shader>("Assets/NumberSurface.shader");
                 if( NumShader == null )
                 {
                     modEntry.Logger.Error("Failed to load numbering shader from asset bundle");
                     return false;
+                }
+                else
+                {
+                    modEntry.Logger.Log($"Loaded numbering shader {NumShader.name}");
                 }
             }
             else
@@ -83,7 +89,7 @@ namespace NumberManagerMod
 
             LoadSchemes();
 
-            var harmony = HarmonyInstance.Create("cc.foxden.number_manager");
+            var harmony = new Harmony("cc.foxden.number_manager");
             harmony.PatchAll(System.Reflection.Assembly.GetExecutingAssembly());
 
             return true;
@@ -217,6 +223,13 @@ namespace NumberManagerMod
         {
             if( !TryGetAssignedSkin(car, out var skin) ) return;
             var numScheme = GetScheme(car.carType, skin.name);
+
+            // make sure Unity didn't chuck out the asset bundle
+            if( NumShader == null )
+            {
+                if( NumberingBundle == null ) NumberingBundle = AssetBundle.LoadFromMemory(NumberingBundleData);
+                NumShader = NumberingBundle.LoadAsset<Shader>("Assets/NumberSurface.shader");
+            }
 
             if( (numScheme == null) || (NumShader == null) )
             {
