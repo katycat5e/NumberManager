@@ -264,7 +264,8 @@ namespace NumberManagerMod
                 {
                     if( Settings.PreferCarId && !numScheme.ForceRandom )
                     {
-                        carNumber = GetCarIdNumber(car.ID);
+                        int offset = Settings.AllowCarIdOffset ? numScheme.Offset : 0;
+                        carNumber = GetCarIdNumber(car.ID) + offset;
                     }
                     else carNumber = numScheme.GetRandomNum();
                 }

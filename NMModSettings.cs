@@ -9,8 +9,8 @@ namespace NumberManagerMod
         [Draw("Use Car ID for number")]
         public bool PreferCarId = true;
 
-        //[Draw("Allow skins to supply a Car ID offset")]
-        //public bool AllowCarIdOffset = true;
+        [Draw("Allow skins to supply a Car ID offset")]
+        public bool AllowCarIdOffset = true;
 
         public override void Save( UnityModManager.ModEntry modEntry )
         {

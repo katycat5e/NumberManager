@@ -27,6 +27,9 @@ namespace NumberManagerMod
         public int MaxNumber = 9999;
 
         [XmlAttribute]
+        public int Offset = 0;
+
+        [XmlAttribute]
         public bool ForceRandom = false;
 
         [XmlIgnore]
@@ -78,7 +81,8 @@ namespace NumberManagerMod
         {
             if( Sequence == null ) CreateShuffledOrder();
 
-            int result = Sequence[SequenceIdx];
+            int offset = NumberManager.Settings.AllowCarIdOffset ? Offset : 0;
+            int result = Sequence[SequenceIdx] + offset;
 
             SequenceIdx += 1;
             if( SequenceIdx >= Sequence.Length ) SequenceIdx = 0;
