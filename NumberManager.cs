@@ -275,7 +275,7 @@ namespace NumberManagerMod
             SetCarNumber(car.CarGUID, carNumber);
 
             // Check if the texture we're targeting is supplied by the skin
-            var tgtTex = skin.GetTexture(numScheme.TargetTexture)?.textureData;
+            var tgtTex = skin.GetTexture(numScheme.TargetTexture)?.TextureData;
             NumShaderProps shaderProps = null;
 
             if( tgtTex != null )
