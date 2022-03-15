@@ -381,7 +381,7 @@ namespace NumberManagerMod
 
         private void UpdateNumberFromCar( TrainCar car )
         {
-            int savedNum = NumberManager.GetSavedCarNumber(car.CarGUID);
+            int savedNum = NumberManager.GetCurrentCarNumber(car);
             int[] toCopy = { 0, 0, 0, 1 };
 
             if( savedNum >= 0 )
@@ -415,9 +415,7 @@ namespace NumberManagerMod
             }
 
             int num = BuildNumber();
-
-            NumberManager.SetCarNumber(SelectedCar.CarGUID, num);
-            NumberManager.ApplyNumbering(SelectedCar);
+            NumberManager.ApplyNumbering(SelectedCar, num);
 
             if( CarTypes.IsSteamLocomotive(SelectedCar.carType) && SelectedCar.rearCoupler.IsCoupled() )
             {
@@ -425,8 +423,7 @@ namespace NumberManagerMod
                 if( (attachedCar != null) && CarTypes.IsTender(attachedCar.carType) )
                 {
                     // car attached behind loco is tender
-                    NumberManager.SetCarNumber(attachedCar.CarGUID, num);
-                    NumberManager.ApplyNumbering(attachedCar);
+                    NumberManager.ApplyNumbering(attachedCar, num);
                 }
             }
         }
