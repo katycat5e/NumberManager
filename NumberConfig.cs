@@ -12,6 +12,9 @@ namespace NumberManagerMod
     {
         private const string FONT_TEX_FILE = "num.png";
 
+        [XmlIgnore]
+        public SkinManagerMod.Skin Skin = null;
+
         [XmlAttribute]
         public string TargetTexture;
 

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using HarmonyLib;
 using Newtonsoft.Json.Linq;
+using SkinManagerMod;
 using UnityEngine;
 
 namespace NumberManagerMod
@@ -21,7 +22,7 @@ namespace NumberManagerMod
         }
     }
 
-    [HarmonyPatch(typeof(SkinManagerMod.Main), "ReplaceTexture")]
+    [HarmonyPatch(typeof(SkinManager), nameof(SkinManager.ApplySkin), typeof(TrainCar), typeof(Skin))]
     class SkinManager_ReplaceTexture_Patch
     {
         private static DefaultTexInfo GetDefaultTexInfo( MeshRenderer renderer )
@@ -44,7 +45,8 @@ namespace NumberManagerMod
 
         static void Postfix( TrainCar trainCar, Dictionary<MeshRenderer, DefaultTexInfo> __state )
         {
-            NumberManager.ApplyNumbering(trainCar, __state);
+            int number = NumberManager.GetCurrentCarNumber(trainCar);
+            NumberManager.ApplyNumbering(trainCar, number, __state);
         }
     }
 
