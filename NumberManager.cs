@@ -1,4 +1,5 @@
-﻿using DV.JObjectExtstensions;
+﻿using CommandTerminal;
+using DV.JObjectExtstensions;
 using HarmonyLib;
 using Newtonsoft.Json.Linq;
 using SkinManagerMod;
@@ -89,23 +90,50 @@ namespace NumberManagerMod
 
             LoadSchemes();
 
+            try
+            {
+                Terminal.Shell.AddCommand("NM.ReloadConfig", ReloadConfig, 0, 0, "Reload all number configs");
+                Terminal.Autocomplete.Register("NM.ReloadConfig");
+            }
+            catch
+            {
+                modEntry.Logger.Error("Failed to register terminal commands");
+            }
+
             var harmony = new Harmony("cc.foxden.number_manager");
             harmony.PatchAll(System.Reflection.Assembly.GetExecutingAssembly());
 
             return true;
         }
 
+        private static void ReloadConfig(CommandArg[] args)
+        {
+            LoadSchemes();
+
+            var allCars = UnityEngine.Object.FindObjectsOfType<TrainCar>();
+            foreach (var car in allCars)
+            {
+                if (SavedCarNumbers.TryGetValue(car.CarGUID, out int num))
+                {
+                    ApplyNumbering(car, num);
+                }
+            }
+        }
+
         private static void LoadSchemes()
         {
-            if( !Directory.Exists(skinsFolder) ) return;
+            if (!Directory.Exists(skinsFolder)) return;
+
+            DefaultShaders.Clear();
+            NumberSchemes.Clear();
 
             // Check each skin under each car type for a numbering config file
-            foreach ((TrainCarType carType, _) in SkinManager.EnabledCarTypes )
+            foreach (TrainCarType carType in SkinManager.EnabledCarTypes.Keys)
             {
                 var loadedSkins = SkinManager.GetSkinsForType(carType);
 
                 var shaderDict = new Dictionary<string, Shader>();
-                DefaultShaders.Add(carType, shaderDict);
+                DefaultShaders[carType] = shaderDict;
 
                 foreach (var skin in loadedSkins)
                 {
@@ -121,6 +149,8 @@ namespace NumberManagerMod
 
                     if (config != null)
                     {
+                        NumberSchemes[new SchemeKey(carType, skin.Name)] = config;
+
                         // get default shader for targeted material
                         var carPrefabObj = CarTypes.GetCarPrefab(carType);
 
@@ -142,24 +172,24 @@ namespace NumberManagerMod
             }
         }
 
-        public static NumberConfig LoadConfig( TrainCarType carType, Skin skin, string configPath )
+        public static NumberConfig LoadConfig(TrainCarType carType, Skin skin, string configPath)
         {
             NumberConfig config = null;
 
             try
             {
-                using( var stream = new FileStream(configPath, FileMode.Open) )
+                using(var stream = new FileStream(configPath, FileMode.Open))
                 {
                     config = serializer.Deserialize(stream) as NumberConfig;
                 }
             }
-            catch( Exception ex )
+            catch (Exception ex)
             {
                 modEntry.Logger.Warning($"Error loading numbering config in \"{configPath}\": {ex.Message}");
                 return null;
             }
 
-            if( config != null )
+            if (config != null)
             {
                 string dir = Path.GetDirectoryName(configPath);
 
@@ -167,9 +197,8 @@ namespace NumberManagerMod
                 {
                     config.Initialize(dir);
                     config.Skin = skin;
-                    NumberSchemes.Add(new SchemeKey(carType, skin.Name), config);
                 }
-                catch( Exception ex )
+                catch (Exception ex)
                 {
                     modEntry.Logger.Error($"Exception when loading numbering config for {skin.Name}:\n{ex.Message}");
                 }
