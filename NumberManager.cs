@@ -89,6 +89,7 @@ namespace NumberManagerMod
             }
 
             LoadSchemes();
+            SkinManager.SkinsLoaded += OnSkinsLoaded;
 
             try
             {
@@ -106,13 +107,33 @@ namespace NumberManagerMod
             return true;
         }
 
+        private static void OnSkinsLoaded(TrainCarType? loadedCarType)
+        {
+            if (loadedCarType.HasValue)
+            {
+                LoadSchemesForCar(loadedCarType.Value);
+            }
+            else
+            {
+                LoadSchemes();
+            }
+
+            ReapplyNumbers(loadedCarType);
+        }
+
         private static void ReloadConfig(CommandArg[] args)
         {
             LoadSchemes();
+            ReapplyNumbers();
+        }
 
+        private static void ReapplyNumbers(TrainCarType? carType = null)
+        {
             var allCars = UnityEngine.Object.FindObjectsOfType<TrainCar>();
             foreach (var car in allCars)
             {
+                if (carType.HasValue && (car.carType != carType.Value)) continue;
+
                 if (SavedCarNumbers.TryGetValue(car.CarGUID, out int num))
                 {
                     ApplyNumbering(car, num);
@@ -130,44 +151,54 @@ namespace NumberManagerMod
             // Check each skin under each car type for a numbering config file
             foreach (TrainCarType carType in SkinManager.EnabledCarTypes.Keys)
             {
-                var loadedSkins = SkinManager.GetSkinsForType(carType);
+                LoadSchemesForCar(carType);
+            }
+        }
 
-                var shaderDict = new Dictionary<string, Shader>();
-                DefaultShaders[carType] = shaderDict;
+        private static void LoadSchemesForCar(TrainCarType carType)
+        {
+            var loadedSkins = SkinManager.GetSkinsForType(carType);
 
-                foreach (var skin in loadedSkins)
+            var shaderDict = new Dictionary<string, Shader>();
+            DefaultShaders[carType] = shaderDict;
+
+            foreach (var skin in loadedSkins)
+            {
+                if (string.IsNullOrEmpty(skin?.Path)) continue;
+
+                string configFile = Path.Combine(skin.Path, NUM_CONFIG_FILE);
+                NumberConfig config = null;
+
+                if (File.Exists(configFile))
                 {
-                    if (string.IsNullOrEmpty(skin?.Path)) continue;
+                    config = LoadConfig(carType, skin, configFile);
+                }
 
-                    string configFile = Path.Combine(skin.Path, NUM_CONFIG_FILE);
-                    NumberConfig config = null;
+                var key = new SchemeKey(carType, skin.Name);
+                if (config != null)
+                {
+                    NumberSchemes[key] = config;
 
-                    if (File.Exists(configFile))
+                    // get default shader for targeted material
+                    var carPrefabObj = CarTypes.GetCarPrefab(carType);
+
+                    if (carPrefabObj != null)
                     {
-                        config = LoadConfig(carType, skin, configFile);
-                    }
-
-                    if (config != null)
-                    {
-                        NumberSchemes[new SchemeKey(carType, skin.Name)] = config;
-
-                        // get default shader for targeted material
-                        var carPrefabObj = CarTypes.GetCarPrefab(carType);
-
-                        if (carPrefabObj != null)
+                        foreach (MeshRenderer renderer in carPrefabObj.GetComponentsInChildren<MeshRenderer>())
                         {
-                            foreach (MeshRenderer renderer in carPrefabObj.GetComponentsInChildren<MeshRenderer>())
+                            if (renderer.material.HasProperty("_MainTex") && (renderer.material.GetTexture("_MainTex") is Texture2D mainTex))
                             {
-                                if (renderer.material.HasProperty("_MainTex") && (renderer.material.GetTexture("_MainTex") is Texture2D mainTex))
+                                if (string.Equals(mainTex.name, config.TargetTexture) && !shaderDict.ContainsKey(mainTex.name))
                                 {
-                                    if (string.Equals(mainTex.name, config.TargetTexture) && !shaderDict.ContainsKey(mainTex.name))
-                                    {
-                                        shaderDict.Add(mainTex.name, renderer.material.shader);
-                                    }
+                                    shaderDict.Add(mainTex.name, renderer.material.shader);
                                 }
                             }
                         }
                     }
+                }
+                else if (NumberSchemes.ContainsKey(key))
+                {
+                    NumberSchemes.Remove(key);
                 }
             }
         }
