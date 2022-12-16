@@ -184,7 +184,7 @@ namespace NumberManagerMod
 
                     if (carPrefabObj != null)
                     {
-                        foreach (MeshRenderer renderer in carPrefabObj.GetComponentsInChildren<MeshRenderer>())
+                        foreach (MeshRenderer renderer in carPrefabObj.GetComponentsInChildren<MeshRenderer>(true))
                         {
                             if (renderer.material.HasProperty("_MainTex") && (renderer.material.GetTexture("_MainTex") is Texture2D mainTex))
                             {

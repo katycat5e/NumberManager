@@ -45,6 +45,7 @@ namespace NumberManagerMod
         public static NumShaderProps GetShaderProps( NumberConfig scheme, int number, int width, int height )
         {
             int[] digits = GetDigits(number);
+            int[] reversedDigits = digits.Reverse().ToArray();
 
             Vector2 mainSize = new Vector2(width, height);
             Vector2 fontTexSize = new Vector2(scheme.TextureWidth, scheme.TextureHeight);
@@ -78,8 +79,11 @@ namespace NumberManagerMod
                 }
                 nTotalDigits += digits.Length;
 
+                // get digit array for this attach point
+                var adjustedDigits = font.ReverseDigits ? reversedDigits : digits;
+
                 // sum of char widths + (kerning * (nDigits - 1))
-                int numberWidth = digits.Select(d => font.CharWidthArr[d] + font.Kerning).Sum() - font.Kerning; // in pixels
+                int numberWidth = adjustedDigits.Select(d => font.CharWidthArr[d] + font.Kerning).Sum() - font.Kerning; // in pixels
 
                 int mainStart, mainEnd, transStart, transEnd;
 
@@ -97,7 +101,7 @@ namespace NumberManagerMod
                 }
 
                 // digit widths as MainTex uv distance
-                foreach( int d in digits )
+                foreach( int d in adjustedDigits )
                 {
                     mainEnd = mainStart + font.CharWidthArr[d];
                     int nextMain = mainEnd + font.Kerning;

@@ -158,6 +158,9 @@ namespace NumberManagerMod
         [XmlAttribute]
         public int Kerning;
 
+        [XmlAttribute]
+        public bool ReverseDigits = false;
+
         private int[] ParseIntArray( string s, string dbgName )
         {
             if( s == null ) throw new ArgumentException($"{dbgName} attribute cannot be null");
