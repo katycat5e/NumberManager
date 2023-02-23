@@ -72,7 +72,7 @@
             half4 spec = tex2D( _MetallicGlossMap, IN.uv_MainTex );
             half3 emit = GammaToLinearSpace( tex2D( _EmissionMap, IN.uv_MainTex ) );
 
-            spec = half4(GammaToLinearSpace( spec ), spec.a);
+            //spec = half4(GammaToLinearSpace( spec ), spec.a);
 
             [unroll( MAX_DIGITS )]
             for( int i = 0; i < _NDigits; i++ )
