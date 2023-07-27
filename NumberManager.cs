@@ -1,7 +1,6 @@
 ﻿using CommandTerminal;
-using DV.JObjectExtstensions;
+using DV.ThingTypes;
 using HarmonyLib;
-using Newtonsoft.Json.Linq;
 using SkinManagerMod;
 using System;
 using System.Collections.Generic;
@@ -13,8 +12,6 @@ using UnityModManagerNet;
 
 namespace NumberManagerMod
 {
-    using SchemeKey = Tuple<TrainCarType, string>;
-
     public static partial class NumberManager
     {
         public const string NUM_CONFIG_FILE = "numbering.xml";
@@ -24,9 +21,7 @@ namespace NumberManagerMod
         private static XmlSerializer serializer;
         public static NMModSettings Settings { get; private set; }
 
-        private static string skinsFolder;
-
-        public static readonly Dictionary<SchemeKey, NumberConfig> NumberSchemes = new Dictionary<SchemeKey, NumberConfig>();
+        public static readonly Dictionary<string, NumberConfig> NumberSchemes = new Dictionary<string, NumberConfig>();
         public static readonly Dictionary<string, int> SavedCarNumbers = new Dictionary<string, int>();
 
         private static byte[] NumberingBundleData = null;
@@ -34,8 +29,11 @@ namespace NumberManagerMod
         public static Shader NumShader { get; private set; } = null;
         public static int? LastSteamerNumber { get; private set; } = null;
 
-        private static readonly Dictionary<TrainCarType, Dictionary<string, Shader>> DefaultShaders = 
-            new Dictionary<TrainCarType, Dictionary<string, Shader>>();
+        private static readonly Dictionary<string, Shader> DefaultShaders = 
+            new Dictionary<string, Shader>();
+
+        private static string GetDefaultShaderKey(TrainCarLivery livery, string textureName) => $"{livery.id}_{textureName}";
+        private static string GetSchemeKey(TrainCarLivery livery, string skinName) => $"{livery.id}_{skinName}";
 
         #region Initialization
 
@@ -56,8 +54,6 @@ namespace NumberManagerMod
             Settings = UnityModManager.ModSettings.Load<NMModSettings>(modEntry);
             modEntry.OnGUI = DrawGUI;
             modEntry.OnSaveGUI = SaveGUI;
-
-            skinsFolder = Path.Combine(skinManagerEntry.Path, "Skins");
 
             // we only need one instance of the serializer
             serializer = new XmlSerializer(typeof(NumberConfig));
@@ -80,6 +76,7 @@ namespace NumberManagerMod
                 else
                 {
                     modEntry.Logger.Log($"Loaded numbering shader {NumShader.name}");
+                    //UnityEngine.Object.DontDestroyOnLoad(NumShader);
                 }
             }
             else
@@ -89,12 +86,20 @@ namespace NumberManagerMod
             }
 
             LoadSchemes();
-            SkinManager.SkinsLoaded += OnSkinsLoaded;
+            SkinProvider.SkinsLoaded += OnSkinsLoaded;
 
             try
             {
-                Terminal.Shell.AddCommand("NM.ReloadConfig", ReloadConfig, 0, 0, "Reload all number configs");
-                Terminal.Autocomplete.Register("NM.ReloadConfig");
+                var command = new CommandInfo()
+                {
+                    name = "NM.ReloadConfig",
+                    proc = ReloadConfig,
+                    min_arg_count = 0,
+                    max_arg_count = 0,
+                    help = "Reload all number configs",
+                };
+                Terminal.Shell.AddCommand(command);
+                Terminal.Autocomplete.Register(command);
             }
             catch
             {
@@ -107,18 +112,10 @@ namespace NumberManagerMod
             return true;
         }
 
-        private static void OnSkinsLoaded(TrainCarType? loadedCarType)
+        private static void OnSkinsLoaded()
         {
-            if (loadedCarType.HasValue)
-            {
-                LoadSchemesForCar(loadedCarType.Value);
-            }
-            else
-            {
-                LoadSchemes();
-            }
-
-            ReapplyNumbers(loadedCarType);
+            LoadSchemes();
+            ReapplyNumbers();
         }
 
         private static void ReloadConfig(CommandArg[] args)
@@ -127,13 +124,11 @@ namespace NumberManagerMod
             ReapplyNumbers();
         }
 
-        private static void ReapplyNumbers(TrainCarType? carType = null)
+        private static void ReapplyNumbers()
         {
             var allCars = UnityEngine.Object.FindObjectsOfType<TrainCar>();
             foreach (var car in allCars)
             {
-                if (carType.HasValue && (car.carType != carType.Value)) continue;
-
                 if (SavedCarNumbers.TryGetValue(car.CarGUID, out int num))
                 {
                     ApplyNumbering(car, num);
@@ -143,67 +138,61 @@ namespace NumberManagerMod
 
         private static void LoadSchemes()
         {
-            if (!Directory.Exists(skinsFolder)) return;
-
             DefaultShaders.Clear();
             NumberSchemes.Clear();
 
             // Check each skin under each car type for a numbering config file
-            foreach (TrainCarType carType in SkinManager.EnabledCarTypes.Keys)
+            foreach (var group in SkinProvider.AllSkinGroups)
             {
-                LoadSchemesForCar(carType);
+                foreach (var skin in group.Skins)
+                {
+                    LoadSchemeFromSkin(group.TrainCarType, skin);
+                }
             }
         }
 
-        private static void LoadSchemesForCar(TrainCarType carType)
+        private static void LoadSchemeFromSkin(TrainCarLivery carType, Skin skin)
         {
-            var loadedSkins = SkinManager.GetSkinsForType(carType);
+            if (string.IsNullOrEmpty(skin?.Path)) return;
 
-            var shaderDict = new Dictionary<string, Shader>();
-            DefaultShaders[carType] = shaderDict;
+            string configFile = Path.Combine(skin.Path, NUM_CONFIG_FILE);
+            NumberConfig config = null;
 
-            foreach (var skin in loadedSkins)
+            if (File.Exists(configFile))
             {
-                if (string.IsNullOrEmpty(skin?.Path)) continue;
+                config = LoadConfig(carType, skin, configFile);
+            }
 
-                string configFile = Path.Combine(skin.Path, NUM_CONFIG_FILE);
-                NumberConfig config = null;
+            string schemeKey = GetSchemeKey(carType, skin.Name);
+            if (config != null)
+            {
+                NumberSchemes[schemeKey] = config;
 
-                if (File.Exists(configFile))
+                // get default shader for targeted material
+                var carPrefabObj = carType.prefab;
+
+                if (carPrefabObj != null)
                 {
-                    config = LoadConfig(carType, skin, configFile);
-                }
-
-                var key = new SchemeKey(carType, skin.Name);
-                if (config != null)
-                {
-                    NumberSchemes[key] = config;
-
-                    // get default shader for targeted material
-                    var carPrefabObj = CarTypes.GetCarPrefab(carType);
-
-                    if (carPrefabObj != null)
+                    foreach (MeshRenderer renderer in carPrefabObj.GetComponentsInChildren<MeshRenderer>(true))
                     {
-                        foreach (MeshRenderer renderer in carPrefabObj.GetComponentsInChildren<MeshRenderer>(true))
+                        if (renderer.material.HasProperty("_MainTex") && (renderer.material.GetTexture("_MainTex") is Texture2D mainTex))
                         {
-                            if (renderer.material.HasProperty("_MainTex") && (renderer.material.GetTexture("_MainTex") is Texture2D mainTex))
+                            string shaderKey = GetDefaultShaderKey(carType, mainTex.name);
+                            if (string.Equals(mainTex.name, config.TargetTexture) && !DefaultShaders.ContainsKey(shaderKey))
                             {
-                                if (string.Equals(mainTex.name, config.TargetTexture) && !shaderDict.ContainsKey(mainTex.name))
-                                {
-                                    shaderDict.Add(mainTex.name, renderer.material.shader);
-                                }
+                                DefaultShaders.Add(shaderKey, renderer.material.shader);
                             }
                         }
                     }
                 }
-                else if (NumberSchemes.ContainsKey(key))
-                {
-                    NumberSchemes.Remove(key);
-                }
+            }
+            else if (NumberSchemes.ContainsKey(schemeKey))
+            {
+                NumberSchemes.Remove(schemeKey);
             }
         }
 
-        public static NumberConfig LoadConfig(TrainCarType carType, Skin skin, string configPath)
+        public static NumberConfig LoadConfig(TrainCarLivery carType, Skin skin, string configPath)
         {
             NumberConfig config = null;
 
@@ -226,7 +215,7 @@ namespace NumberManagerMod
 
                 try
                 {
-                    config.Initialize(dir);
+                    config.Initialize(carType, dir);
                     config.Skin = skin;
                 }
                 catch (Exception ex)
@@ -263,7 +252,7 @@ namespace NumberManagerMod
         {
             // Previously un-numbered car
             // A new tender should try to match engine if possible
-            if (CarTypes.IsTender(car.carType) && LastSteamerNumber.HasValue)
+            if (CarTypes.IsTender(car.carLivery) && LastSteamerNumber.HasValue)
             {
                 return LastSteamerNumber.Value;
             }
@@ -286,15 +275,18 @@ namespace NumberManagerMod
         {
             var skin = SkinManager.GetCurrentCarSkin(car);
             if (skin == null) return null;
-            return GetScheme(car.carType, skin.Name);
+            return GetScheme(car.carLivery, skin.Name);
         }
 
-        public static NumberConfig GetScheme( TrainCarType carType, string skinName )
+        public static NumberConfig GetScheme(TrainCarLivery carType, string skinName)
         {
-            var key = new SchemeKey(carType, skinName);
+            var key = GetSchemeKey(carType, skinName);
 
-            if( NumberSchemes.TryGetValue(key, out var config) ) return config;
-            else return null;
+            if (NumberSchemes.TryGetValue(key, out var config))
+            {
+                return config;
+            }
+            return null;
         }
 
         /// <summary>
@@ -329,9 +321,10 @@ namespace NumberManagerMod
                     if( !renderer.material.HasProperty("_MainTex") ) continue;
 
                     string texName = renderer.material.GetTexture("_MainTex")?.name;
-                    if( !string.IsNullOrEmpty(texName) &&
-                        DefaultShaders.TryGetValue(car.carType, out var shaderDict) &&
-                        shaderDict.TryGetValue(texName, out Shader defShader) )
+                    if (string.IsNullOrEmpty(texName)) continue;
+
+                    string shaderKey = GetDefaultShaderKey(car.carLivery, texName);
+                    if (DefaultShaders.TryGetValue(shaderKey, out Shader defShader) )
                     {
                         renderer.material.shader = defShader;
                     }
@@ -342,7 +335,7 @@ namespace NumberManagerMod
             modEntry.Logger.Log($"Applying number {number} to {car.ID}");
             SetCarNumber(car.CarGUID, number);
 
-            if (CarTypes.IsSteamLocomotive(car.carType))
+            if (CarTypes.IsSteamLocomotive(car.carLivery))
             {
                 LastSteamerNumber = number;
             }
@@ -422,7 +415,7 @@ namespace NumberManagerMod
 
         public static void LoadSaveData()
         {
-            var numberData = SaveGameManager.data.GetObject<NumberData>(SAVE_DATA_KEY);
+            var numberData = SaveGameManager.Instance.data.GetObject<NumberData>(SAVE_DATA_KEY);
 
             if ((numberData != null) && (numberData.carNumbers != null))
             {
@@ -449,7 +442,7 @@ namespace NumberManagerMod
                 carNumbers = SavedCarNumbers.Select(CreateSaveEntry).ToArray()
             };
 
-            SaveGameManager.data.SetObject(SAVE_DATA_KEY, numberData);
+            SaveGameManager.Instance.data.SetObject(SAVE_DATA_KEY, numberData);
         }
 
         #endregion

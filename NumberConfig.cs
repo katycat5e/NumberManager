@@ -1,5 +1,6 @@
-﻿using System;
-using System.Collections;
+﻿using DV.ThingTypes;
+using SMShared;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -106,8 +107,13 @@ namespace NumberManagerMod
         public int TextureHeight = 0;
 
 
-        public void Initialize( string dirPath )
+        public void Initialize(TrainCarLivery carType, string dirPath )
         {
+            if (Remaps.TryGetUpdatedTextureName(carType.id, TargetTexture, out string newTexName))
+            {
+                TargetTexture = newTexName;
+            }
+
             string fontPath = Path.Combine(dirPath, FONT_TEX_FILE);
             var imgData = File.ReadAllBytes(fontPath);
 

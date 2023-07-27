@@ -1,9 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using DV;
+using DV.ThingTypes;
 using HarmonyLib;
 using UnityEngine;
 
@@ -417,10 +415,10 @@ namespace NumberManagerMod
             int num = BuildNumber();
             NumberManager.ApplyNumbering(SelectedCar, num);
 
-            if( CarTypes.IsSteamLocomotive(SelectedCar.carType) && SelectedCar.rearCoupler.IsCoupled() )
+            if (CarTypes.IsSteamLocomotive(SelectedCar.carLivery) && SelectedCar.rearCoupler.IsCoupled())
             {
                 TrainCar attachedCar = SelectedCar.rearCoupler.coupledTo?.train;
-                if( (attachedCar != null) && CarTypes.IsTender(attachedCar.carType) )
+                if ((attachedCar != null) && CarTypes.IsTender(attachedCar.carLivery))
                 {
                     // car attached behind loco is tender
                     NumberManager.ApplyNumbering(attachedCar, num);
