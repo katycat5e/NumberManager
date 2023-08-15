@@ -5,7 +5,8 @@ using DV.ThingTypes;
 using HarmonyLib;
 using UnityEngine;
 
-namespace NumberManagerMod
+#nullable disable
+namespace NumberManager.Mod
 {
     public class CommsRadioNumberSwitcher : MonoBehaviour, ICommsRadioMode
     {
@@ -49,9 +50,7 @@ namespace NumberManagerMod
         public void Awake()
         {
             // steal components from other radio modes
-            CommsRadioCarDeleter deleter = Controller.deleteControl;
-
-            if( deleter != null )
+            if (Controller.deleteControl is CommsRadioCarDeleter deleter)
             {
                 signalOrigin = deleter.signalOrigin;
                 display = deleter.display;
@@ -377,6 +376,24 @@ namespace NumberManagerMod
 
         #region Number Shenanigans
 
+        // Split the given integer into its decimal digits
+        private static int[] GetDigits(int number)
+        {
+            var digits = new List<int>();
+
+            while ((digits.Count < 4) || (number > 0))
+            {
+                if (number > 0)
+                {
+                    digits.Add(number % 10);
+                    number /= 10;
+                }
+                else digits.Add(0);
+            }
+
+            return digits.Reverse<int>().ToArray();
+        }
+
         private void UpdateNumberFromCar( TrainCar car )
         {
             int savedNum = NumberManager.GetCurrentCarNumber(car);
@@ -384,7 +401,7 @@ namespace NumberManagerMod
 
             if( savedNum >= 0 )
             {
-                toCopy = NumberManager.GetDigits(savedNum, 4);
+                toCopy = GetDigits(savedNum);
             }
 
             for( int i = 0; i < 4; i++ )
@@ -449,7 +466,7 @@ namespace NumberManagerMod
         private static readonly int[] DigitOffset = new int[] { 1000, 100, 10, 1 };
         private static readonly string[] StateDigitFormat = new string[]
         {
-            null,
+            null!,
             "\xBB{0}\xAB {1} {2} {3}",
             "{0} \xBB{1}\xAB {2} {3}",
             "{0} {1} \xBB{2}\xAB {3}",
@@ -470,3 +487,4 @@ namespace NumberManagerMod
         }
     }
 }
+#nullable restore

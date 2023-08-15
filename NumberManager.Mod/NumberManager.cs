@@ -1,6 +1,8 @@
 ﻿using CommandTerminal;
+using DV;
 using DV.ThingTypes;
 using HarmonyLib;
+using NumberManager.Shared;
 using SkinManagerMod;
 using System;
 using System.Collections.Generic;
@@ -10,30 +12,42 @@ using System.Xml.Serialization;
 using UnityEngine;
 using UnityModManagerNet;
 
-namespace NumberManagerMod
+namespace NumberManager.Mod
 {
     public static partial class NumberManager
     {
         public const string NUM_CONFIG_FILE = "numbering.xml";
 
-        internal static UnityModManager.ModEntry modEntry;
-        private static UnityModManager.ModEntry skinManagerEntry;
-        private static XmlSerializer serializer;
-        public static NMModSettings Settings { get; private set; }
+        internal static UnityModManager.ModEntry modEntry = null!;
+        private static UnityModManager.ModEntry skinManagerEntry = null!;
+        private static XmlSerializer serializer = null!;
+        public static NMModSettings Settings { get; private set; } = null!;
 
         public static readonly Dictionary<string, NumberConfig> NumberSchemes = new Dictionary<string, NumberConfig>();
+        public static readonly List<NumberConfig> DefaultSchemes = new List<NumberConfig>();
         public static readonly Dictionary<string, int> SavedCarNumbers = new Dictionary<string, int>();
 
-        private static byte[] NumberingBundleData = null;
-        private static AssetBundle NumberingBundle = null;
-        public static Shader NumShader { get; private set; } = null;
+        private static byte[]? NumberingBundleData = null;
+        private static AssetBundle? NumberingBundle = null;
+        public static Shader? NumShader { get; private set; } = null;
         public static int? LastSteamerNumber { get; private set; } = null;
 
+        private static readonly HashSet<string> _processedLiveryIds = new HashSet<string>();
         private static readonly Dictionary<string, Shader> DefaultShaders = 
             new Dictionary<string, Shader>();
 
         private static string GetDefaultShaderKey(TrainCarLivery livery, string textureName) => $"{livery.id}_{textureName}";
         private static string GetSchemeKey(TrainCarLivery livery, string skinName) => $"{livery.id}_{skinName}";
+        private static string GetSchemeKey(string liveryId, string skinName) => $"{liveryId}_{skinName}";
+
+        private class RemapWrapper : IRemapProvider
+        {
+            public bool TryGetUpdatedTextureName(string carId, string textureName, out string newName)
+            {
+                return SMShared.Remaps.TryGetUpdatedTextureName(carId, textureName, out newName);
+            }
+        }
+        private static readonly RemapWrapper _remapProvider = new RemapWrapper();
 
         #region Initialization
 
@@ -85,15 +99,14 @@ namespace NumberManagerMod
                 return false;
             }
 
-            LoadSchemes();
-            SkinProvider.SkinsLoaded += OnSkinsLoaded;
+            SkinProvider.SkinsLoaded += ReloadConfigs;
 
             try
             {
                 var command = new CommandInfo()
                 {
                     name = "NM.ReloadConfig",
-                    proc = ReloadConfig,
+                    proc = ReloadConfigs,
                     min_arg_count = 0,
                     max_arg_count = 0,
                     help = "Reload all number configs",
@@ -112,17 +125,16 @@ namespace NumberManagerMod
             return true;
         }
 
-        private static void OnSkinsLoaded()
+        private static void ReloadConfigs(bool reapply)
         {
             LoadSchemes();
-            ReapplyNumbers();
+            LoadDefaultSchemes();
+            if (reapply) ReapplyNumbers();
         }
 
-        private static void ReloadConfig(CommandArg[] args)
-        {
-            LoadSchemes();
-            ReapplyNumbers();
-        }
+        private static void ReloadConfigs() => ReloadConfigs(true);
+
+        private static void ReloadConfigs(CommandArg[] args) => ReloadConfigs();
 
         private static void ReapplyNumbers()
         {
@@ -138,25 +150,77 @@ namespace NumberManagerMod
 
         private static void LoadSchemes()
         {
-            DefaultShaders.Clear();
             NumberSchemes.Clear();
 
             // Check each skin under each car type for a numbering config file
             foreach (var group in SkinProvider.AllSkinGroups)
             {
-                foreach (var skin in group.Skins)
+                foreach (var skin in group.Skins.Where(s => !s.IsDefault))
                 {
                     LoadSchemeFromSkin(group.TrainCarType, skin);
                 }
             }
         }
 
-        private static void LoadSchemeFromSkin(TrainCarLivery carType, Skin skin)
+        private static void LoadDefaultSchemes()
         {
-            if (string.IsNullOrEmpty(skin?.Path)) return;
+            const string DEFAULT_NUM_FOLDER = "defaults";
 
-            string configFile = Path.Combine(skin.Path, NUM_CONFIG_FILE);
-            NumberConfig config = null;
+            foreach (var livery in Globals.G.Types.Liveries)
+            {
+                var defaultSkin = SkinProvider.GetDefaultSkin(livery.id);
+                string defaultFolder = Path.Combine(modEntry.Path, DEFAULT_NUM_FOLDER, livery.id);
+
+                if ((defaultSkin != null) && Directory.Exists(defaultFolder))
+                {
+                    var scheme = LoadSchemeFromSkin(livery, defaultSkin, defaultFolder);
+                    if (scheme != null)
+                    {
+                        scheme.IsDefault = true;
+                        //DefaultSchemes.Add(scheme);
+                    }
+                }
+            }
+
+            if (!Settings.EnableDefaultNumbers)
+            {
+                SetDefaultSchemesEnabled(false, false);
+            }
+        }
+
+        private static bool _defaultsAreEnabled = false;
+        private static void SetDefaultSchemesEnabled(bool enabled, bool reapply = true)
+        {
+            if (enabled)
+            {
+                foreach (var scheme in DefaultSchemes)
+                {
+                    string key = GetSchemeKey(scheme.LiveryId, scheme.SkinName);
+                    NumberSchemes.Add(key, scheme);
+                }
+                DefaultSchemes.Clear();
+            }
+            else
+            {
+                var defaultEntries = NumberSchemes.Where(kvp => kvp.Value.IsDefault).ToList();
+                foreach (var entry in defaultEntries)
+                {
+                    NumberSchemes.Remove(entry.Key);
+                    DefaultSchemes.Add(entry.Value);
+                }
+            }
+            _defaultsAreEnabled = enabled;
+
+            if (reapply) ReapplyNumbers();
+        }
+
+        private static NumberConfig? LoadSchemeFromSkin(TrainCarLivery carType, Skin skin, string? overridePath = null)
+        {
+            if ((overridePath == null) && string.IsNullOrEmpty(skin?.Path) || skin == null) return null;
+
+            // load config file
+            string configFile = Path.Combine(overridePath ?? skin.Path, NUM_CONFIG_FILE);
+            NumberConfig? config = null;
 
             if (File.Exists(configFile))
             {
@@ -168,33 +232,43 @@ namespace NumberManagerMod
             {
                 NumberSchemes[schemeKey] = config;
 
-                // get default shader for targeted material
-                var carPrefabObj = carType.prefab;
-
-                if (carPrefabObj != null)
+                if (!_processedLiveryIds.Contains(carType.id))
                 {
-                    foreach (MeshRenderer renderer in carPrefabObj.GetComponentsInChildren<MeshRenderer>(true))
-                    {
-                        if (renderer.material.HasProperty("_MainTex") && (renderer.material.GetTexture("_MainTex") is Texture2D mainTex))
-                        {
-                            string shaderKey = GetDefaultShaderKey(carType, mainTex.name);
-                            if (string.Equals(mainTex.name, config.TargetTexture) && !DefaultShaders.ContainsKey(shaderKey))
-                            {
-                                DefaultShaders.Add(shaderKey, renderer.material.shader);
-                            }
-                        }
-                    }
+                    SaveDefaultShaders(carType);
                 }
             }
             else if (NumberSchemes.ContainsKey(schemeKey))
             {
                 NumberSchemes.Remove(schemeKey);
             }
+            return config;
         }
 
-        public static NumberConfig LoadConfig(TrainCarLivery carType, Skin skin, string configPath)
+        private static void SaveDefaultShaders(TrainCarLivery carType)
         {
-            NumberConfig config = null;
+            // get default shader for targeted material
+            var carPrefabObj = carType.prefab;
+
+            if (carPrefabObj != null)
+            {
+                foreach (MeshRenderer renderer in carPrefabObj.GetComponentsInChildren<MeshRenderer>(true))
+                {
+                    if (renderer.material.HasProperty("_MainTex") && (renderer.material.GetTexture("_MainTex") is Texture2D mainTex))
+                    {
+                        string shaderKey = GetDefaultShaderKey(carType, mainTex.name);
+                        if (!DefaultShaders.ContainsKey(shaderKey))
+                        {
+                            DefaultShaders.Add(shaderKey, renderer.material.shader);
+                        }
+                    }
+                }
+                _processedLiveryIds.Add(carType.id);
+            }
+        }
+
+        public static NumberConfig? LoadConfig(TrainCarLivery carType, Skin skin, string configPath)
+        {
+            NumberConfig? config = null;
 
             try
             {
@@ -215,8 +289,8 @@ namespace NumberManagerMod
 
                 try
                 {
-                    config.Initialize(carType, dir);
-                    config.Skin = skin;
+                    config.Initialize(carType.id, dir, _remapProvider);
+                    config.SkinName = skin.Name;
                 }
                 catch (Exception ex)
                 {
@@ -266,19 +340,22 @@ namespace NumberManagerMod
                 }
                 else
                 {
-                    return (scheme != null) ? scheme.GetRandomNum() : 0;
+                    return (scheme != null) ? scheme.GetRandomNum(Settings.AllowCarIdOffset) : 0;
                 }
             }
         }
 
-        public static NumberConfig GetScheme(TrainCar car)
+        public static NumberConfig? GetScheme(TrainCar car)
         {
             var skin = SkinManager.GetCurrentCarSkin(car);
-            if (skin == null) return null;
+            if (skin == null)
+            {
+                return null;
+            }
             return GetScheme(car.carLivery, skin.Name);
         }
 
-        public static NumberConfig GetScheme(TrainCarLivery carType, string skinName)
+        public static NumberConfig? GetScheme(TrainCarLivery carType, string skinName)
         {
             var key = GetSchemeKey(carType, skinName);
 
@@ -294,8 +371,7 @@ namespace NumberManagerMod
         /// </summary>
         public static void ApplyNumbering(TrainCar car, int number)
         {
-            Dictionary<MeshRenderer, DefaultTexInfo> texDict = null;
-            SkinManager_ReplaceTexture_Patch.Prefix(car, ref texDict);
+            SkinManager_ReplaceTexture_Patch.Prefix(car, out Dictionary<MeshRenderer, DefaultTexInfo> texDict);
             ApplyNumbering(car, number, texDict);
         }
 
@@ -320,10 +396,10 @@ namespace NumberManagerMod
                 {
                     if( !renderer.material.HasProperty("_MainTex") ) continue;
 
-                    string texName = renderer.material.GetTexture("_MainTex")?.name;
+                    string? texName = renderer.material.GetTexture("_MainTex")?.name;
                     if (string.IsNullOrEmpty(texName)) continue;
 
-                    string shaderKey = GetDefaultShaderKey(car.carLivery, texName);
+                    string shaderKey = GetDefaultShaderKey(car.carLivery, texName!);
                     if (DefaultShaders.TryGetValue(shaderKey, out Shader defShader) )
                     {
                         renderer.material.shader = defShader;
@@ -345,30 +421,28 @@ namespace NumberManagerMod
             }
 
             // Check if the texture we're targeting is supplied by the skin
-            var tgtTex = numScheme.Skin.GetTexture(numScheme.TargetTexture)?.TextureData;
-            NumShaderProps shaderProps = null;
+            var skin = SkinProvider.FindSkinByName(numScheme.LiveryId, numScheme.SkinName);
+            var tgtTex = skin.GetTexture(numScheme.TargetTexture)?.TextureData;
+            NumShaderProps? shaderProps = null;
 
-            if( tgtTex != null )
+            if (tgtTex != null)
             {
-                shaderProps = GetShaderProps(numScheme, number, tgtTex.width, tgtTex.height);
+                shaderProps = ShaderPropBuilder.GetShaderProps(numScheme, number, tgtTex.width, tgtTex.height, modEntry.Logger.Warning);
             }
             // otherwise we'll be lazy and figure out the width/height when we find the default texture
 
             var renderers = car.gameObject.GetComponentsInChildren<MeshRenderer>();
 
-            foreach( var renderer in renderers )
+            foreach (var renderer in renderers)
             {
-                if( !renderer.material ) continue;
+                if (!renderer.material) continue;
 
                 DefaultTexInfo defaultTex = defaultTexDict[renderer];
 
                 // check if this is the target for numbering
-                if( string.Equals(numScheme.TargetTexture, defaultTex.Name) )
+                if (string.Equals(numScheme.TargetTexture, defaultTex.Name))
                 {
-                    if( shaderProps == null )
-                    {
-                        shaderProps = GetShaderProps(numScheme, number, defaultTex.Width, defaultTex.Height);
-                    }
+                    shaderProps ??= ShaderPropBuilder.GetShaderProps(numScheme, number, defaultTex.Width, defaultTex.Height, modEntry.Logger.Warning);
 
                     renderer.material.shader = NumShader;
                     renderer.material.SetTexture("_FontTex", numScheme.FontTexture);
@@ -410,7 +484,7 @@ namespace NumberManagerMod
 
         public class NumberData
         {
-            public CarSaveEntry[] carNumbers;
+            public CarSaveEntry[]? carNumbers;
         }
 
         public static void LoadSaveData()
@@ -449,14 +523,19 @@ namespace NumberManagerMod
 
         #region Settings
 
-        static void DrawGUI( UnityModManager.ModEntry entry )
+        static void DrawGUI(UnityModManager.ModEntry entry)
         {
             Settings.Draw(entry);
         }
 
-        static void SaveGUI( UnityModManager.ModEntry entry )
+        static void SaveGUI(UnityModManager.ModEntry entry)
         {
             Settings.Save(entry);
+
+            if (Settings.EnableDefaultNumbers ^ _defaultsAreEnabled)
+            {
+                SetDefaultSchemesEnabled(Settings.EnableDefaultNumbers);
+            }
         }
 
         #endregion

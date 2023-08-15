@@ -6,15 +6,15 @@ using Newtonsoft.Json.Linq;
 using SkinManagerMod;
 using UnityEngine;
 
-namespace NumberManagerMod
+namespace NumberManager.Mod
 {
     public struct DefaultTexInfo
     {
-        public readonly string Name;
+        public readonly string? Name;
         public readonly int Width;
         public readonly int Height;
 
-        public DefaultTexInfo( string name, int width, int height )
+        public DefaultTexInfo( string? name, int width, int height )
         {
             Name = name;
             Width = width;
@@ -36,7 +36,7 @@ namespace NumberManagerMod
             else return new DefaultTexInfo(null, 0, 0);
         }
 
-        internal static void Prefix( TrainCar trainCar, ref Dictionary<MeshRenderer, DefaultTexInfo> __state )
+        internal static void Prefix( TrainCar trainCar, out Dictionary<MeshRenderer, DefaultTexInfo> __state )
         {
             // Get the default texture names, because the ReplaceTexture method erases them with the new textures
             var renderers = trainCar.gameObject.GetComponentsInChildren<MeshRenderer>();

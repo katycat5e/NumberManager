@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityModManagerNet;
 
-namespace NumberManagerMod
+namespace NumberManager.Mod
 {
     public class NMModSettings : UnityModManager.ModSettings, IDrawable
     {
@@ -11,6 +11,9 @@ namespace NumberManagerMod
 
         [Draw("Allow skins to supply a Car ID offset")]
         public bool AllowCarIdOffset = true;
+
+        [Draw("Enable the default loco numbers")]
+        public bool EnableDefaultNumbers = true;
 
         public override void Save( UnityModManager.ModEntry modEntry )
         {

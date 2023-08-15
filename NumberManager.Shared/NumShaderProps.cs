@@ -1,7 +1,7 @@
 ﻿using System.Linq;
 using UnityEngine;
 
-namespace NumberManagerMod
+namespace NumberManager.Shared
 {
     public class NumShaderProps
     {

@@ -1,29 +1,39 @@
-﻿using System.Collections.Generic;
+﻿using System;
 using System.Linq;
 using UnityEngine;
 
-namespace NumberManagerMod
+namespace NumberManager.Shared
 {
-    public static partial class NumberManager
+    public static class ShaderPropBuilder
     {
         private const int MAX_DIGITS = 32;
 
         // Split the given integer into its decimal digits
-        public static int[] GetDigits( int number, int padToLength = 1 )
+        private static int[] GetDigits(NumberFont font, int number)
         {
-            var digits = new List<int>();
-
-            while( (digits.Count < padToLength) || (number > 0) )
+            var formatted = string.Format(font.Format, number).ToCharArray();
+            var digits = formatted.Select(c =>
             {
-                if( number > 0 )
+                // numeric digit
+                if ((c >= '0') && (c <= '9'))
                 {
-                    digits.Add(number % 10);
-                    number /= 10;
+                    return c - '0';
                 }
-                else digits.Add(0);
-            }
 
-            return digits.Reverse<int>().ToArray();
+                // special character
+                for (int i = 0; i < font.ExtraChars.Length; i++)
+                {
+                    if (c == font.ExtraChars[i].Char)
+                    {
+                        return i + 10;
+                    }
+                }
+                
+                // fallback
+                return 0;
+            });
+
+            return digits.ToArray();
         }
 
         // Helper methods for shader property initialization
@@ -42,13 +52,10 @@ namespace NumberManagerMod
             );
         }
 
-        public static NumShaderProps GetShaderProps( NumberConfig scheme, int number, int width, int height )
+        public static NumShaderProps GetShaderProps(NumberConfig scheme, int number, int width, int height, Action<string> logWarning)
         {
-            int[] digits = GetDigits(number);
-            int[] reversedDigits = digits.Reverse().ToArray();
-
-            Vector2 mainSize = new Vector2(width, height);
             Vector2 fontTexSize = new Vector2(scheme.TextureWidth, scheme.TextureHeight);
+            Vector2 mainSize = new Vector2(width, height);
 
             Vector4[] digitBounds = new Vector4[MAX_DIGITS];
             Vector4[] digitUV = new Vector4[MAX_DIGITS];
@@ -66,21 +73,23 @@ namespace NumberManagerMod
                 // get font associated with this point
                 if( !IsValidIdx(attachPoint.FontIdx, scheme.Fonts) )
                 {
-                    modEntry.Logger.Warning($"Invalid numbering font index {attachPoint.FontIdx}");
+                    logWarning($"Invalid numbering font index {attachPoint.FontIdx}");
                     continue;
                 }
                 var font = scheme.Fonts[attachPoint.FontIdx];
 
-                if( (nTotalDigits + digits.Length) > MAX_DIGITS )
+                int[] digits = GetDigits(font, number);
+
+                if ( (nTotalDigits + digits.Length) > MAX_DIGITS )
                 {
                     // too many digits! :(
-                    modEntry.Logger.Warning("Maximum number of digits exceeded in numbering scheme");
+                    logWarning("Maximum number of digits exceeded in numbering scheme");
                     break;
                 }
                 nTotalDigits += digits.Length;
 
                 // get digit array for this attach point
-                var adjustedDigits = font.ReverseDigits ? reversedDigits : digits;
+                var adjustedDigits = font.ReverseDigits ? digits.Reverse().ToArray() : digits;
 
                 // sum of char widths + (kerning * (nDigits - 1))
                 int numberWidth = adjustedDigits.Select(d => font.CharWidthArr[d] + font.Kerning).Sum() - font.Kerning; // in pixels
