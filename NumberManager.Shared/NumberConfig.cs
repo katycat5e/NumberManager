@@ -26,6 +26,9 @@ namespace NumberManager.Shared
         [XmlAttribute]
         public FontBlendMode BlendMode = FontBlendMode.Normal;
 
+        [XmlAttribute]
+        public float ColorizeWhiteLevel = 1;
+
         public NumberFont[] Fonts;
 
         [XmlAttribute]
@@ -267,19 +270,24 @@ namespace NumberManager.Shared
 
         public void Initialize()
         {
-            CharWidthArr = ParseIntArray(CharWidthString, "CharWidth", ExtraChars.Select(e => e.Width));
-            CharXArr = ParseIntArray(CharXString, "CharX", ExtraChars.Select(e => e.X));
-            CharYArr = ParseIntArray(CharYString, "CharY", ExtraChars.Select(e => e.Y));
+            CharWidthArr = ParseIntArray(CharWidthString, "CharWidth", ExtraChars?.Select(e => e.Width));
+            CharXArr = ParseIntArray(CharXString, "CharX", ExtraChars?.Select(e => e.X));
+            CharYArr = ParseIntArray(CharYString, "CharY", ExtraChars?.Select(e => e.Y));
 
             EmissionColor = ParseColor(EmissionString, "Emission");
             SpecularColor = ParseColor(SpecularString, "Specular");
+
+            foreach (var c in ExtraChars)
+            {
+                c.Initialize();
+            }
         }
 
         public void StringPack()
         {
-            CharXString = string.Join(",", CharXArr);
-            CharYString = string.Join(",", CharYArr);
-            CharWidthString = string.Join(",", CharWidthArr);
+            CharXString = string.Join(",", CharXArr.Take(10));
+            CharYString = string.Join(",", CharYArr.Take(10));
+            CharWidthString = string.Join(",", CharWidthArr.Take(10));
 
             if (EmissionColor.HasValue)
             {
@@ -300,13 +308,20 @@ namespace NumberManager.Shared
             {
                 SpecularString = null;
             }
+
+            foreach (var c in ExtraChars)
+            {
+                c.StringPack();
+            }
         }
     }
 
     [Serializable]
     public class ExtraChar
     {
-        [XmlAttribute]
+        [XmlAttribute("Char")]
+        public string CharString;
+        [XmlIgnore]
         public char Char;
 
         [XmlAttribute]
@@ -317,6 +332,20 @@ namespace NumberManager.Shared
 
         [XmlAttribute]
         public int Width;
+
+        public void Initialize()
+        {
+            if (string.IsNullOrEmpty(CharString) || (CharString.Length > 1))
+            {
+                throw new ArgumentException("ExtraChar Char property must be a single unicode character");
+            }
+            Char = CharString[0];
+        }
+
+        public void StringPack()
+        {
+            CharString = Char.ToString();
+        }
     }
 
     public enum NumOrientation { Horizontal, Vertical }

@@ -19,7 +19,12 @@ namespace NumberManager.Editor
         public int DisplayNumber;
 
         [Header("Config Generation")]
-        public FontBlendMode BlendMode = FontBlendMode.Normal;
+        public string TargetTextureName;
+        public TargetVehicle TargetVehicle;
+
+        public FontBlendMode BlendMode;
+        [Range(0, 1)]
+        public float ColorizeWhiteLevel;
 
         [Tooltip("Override car number setting and only use random numbers")]
         public bool ForceRandom = false;
@@ -42,16 +47,26 @@ namespace NumberManager.Editor
         private Texture2D _fontAtlas;
         private NumberConfig _numberConfig;
 
+        private string _prevTargetTex;
+        private void OnValidate()
+        {
+            if (TargetTextureName != _prevTargetTex)
+            {
+                TargetVehicle = TargetTextures.GetTargetVehicleForTexture(TargetTextureName);
+            }
+            else if (TargetVehicle != TargetVehicle.NotSet)
+            {
+                TargetTextureName = TargetTextures.GetTargetTexture(TargetVehicle);
+            }
+
+            _prevTargetTex = TargetTextureName;
+        }
+
         public void Update()
         {
             _numberConfig ??= new NumberConfig();
 
             RegenerateFontConfig();
-
-            _numberConfig.FontTexture = _fontAtlas;
-            _numberConfig.AttachPoints = AttachPoints;
-            _numberConfig.TextureWidth = _fontAtlas.width;
-            _numberConfig.TextureHeight = _fontAtlas.height;
 
             RefreshShaderProps();
         }
@@ -63,13 +78,23 @@ namespace NumberManager.Editor
 
         private void RegenerateFontConfig()
         {
+            _numberConfig.Offset = Offset;
+            _numberConfig.MinNumber = MinNumber;
+            _numberConfig.MaxNumber = MaxNumber;
+            _numberConfig.BlendMode = BlendMode;
+            _numberConfig.ColorizeWhiteLevel = ColorizeWhiteLevel;
+            _numberConfig.ForceRandom = ForceRandom;
+            _numberConfig.TargetTexture = TargetTextureName;
+
+            if (Fonts == null || Fonts.Length == 0) return;
+
             _numberConfig.Fonts = new NumberFont[Fonts.Length];
 
             var atlasSizes = Fonts.Select(f => f.GetRotatedAtlasSize()).ToList();
             int atlasHeight = atlasSizes.Max(f => f.y);
             int atlasWidth = atlasSizes.Sum(f => f.x);
 
-            _fontAtlas = new Texture2D(0, 0, TextureFormat.ARGB32, true);
+            _fontAtlas = new Texture2D(0, 0, TextureFormat.ARGB32, false);
             var atlases = new Texture2D[Fonts.Length];
 
             for (int i = 0; i < Fonts.Length; i++)
@@ -86,6 +111,11 @@ namespace NumberManager.Editor
                 Fonts[i].CreateFontSettings(offset);
                 _numberConfig.Fonts[i] = Fonts[i].NumberFont;
             }
+
+            _numberConfig.FontTexture = _fontAtlas;
+            _numberConfig.AttachPoints = AttachPoints;
+            _numberConfig.TextureWidth = _fontAtlas.width;
+            _numberConfig.TextureHeight = _fontAtlas.height;
         }
 
         // get bottom left corner of packed sub atlas
@@ -158,11 +188,12 @@ namespace NumberManager.Editor
 
             var settings = new XmlWriterSettings()
             {
-                OmitXmlDeclaration = true
+                OmitXmlDeclaration = true,
+                Encoding = null,
             };
             var sb = new StringBuilder();
 
-            using var stream = new StringWriter(sb);
+            using var stream = new UTF8StringWriter(sb);
             using var writer = XmlWriter.Create(stream, settings);
             s.Serialize(stream, _numberConfig, namespaces);
 
@@ -171,6 +202,15 @@ namespace NumberManager.Editor
 
             string xmlConfigPath = Path.Combine(exportPath, "numbering.xml");
             File.WriteAllText(xmlConfigPath, result);
+
+            EditorUtility.RevealInFinder(exportPath);
+        }
+
+        private class UTF8StringWriter : StringWriter
+        {
+            public override Encoding Encoding => Encoding.UTF8;
+
+            public UTF8StringWriter(StringBuilder sb) : base(sb) { }
         }
     }
 }

@@ -20,4 +20,8 @@
     <Reference Include="UnityEngine.CoreModule" />
     <Reference Include="UnityEngine.ImageConversionModule" />
   </ItemGroup>
+  
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <Exec Command="setlocal enableextensions&#xD;&#xA;if not exist &quot;$(SolutionDir)$(OutDir)&quot; md &quot;$(SolutionDir)$(OutDir)&quot;&#xD;&#xA;endlocal&#xD;&#xA;xcopy /d /y &quot;$(TargetPath)&quot; &quot;$(SolutionDir)$(OutDir)&quot;" />
+  </Target>
 </Project>

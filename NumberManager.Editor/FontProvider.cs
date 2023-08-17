@@ -18,39 +18,44 @@ namespace NumberManager.Editor
     [Serializable]
     public class FontProvider
     {
+        [Header("Font Layout")]
+        [SourceFont]
         public Font SourceFont;
-        [Min(0)]
-        public float Scale;
+
+        [Min(1)]
+        public int PointSize = 90;
         public FontRotation Rotation;
         public int Kerning;
+        public string ExtraChararacters;
+
+        [Header("Style")]
         public string Format = "{0:D1}";
-        public Color Color;
-        
+        public Color Color = Color.white;
+
+        [Header("Emission")]
         public bool UseEmission;
         [ColorUsage(false, true)]
-        public Color EmissionColor = Color.white;
+        public Color EmissionColor;
 
+        [Header("Metal/Rough")]
         public bool UseSpecular;
         [Range(0, 1)]
         public float Metallic;
         [Range(0, 1)]
         public float Smoothness;
 
-        public bool IsRenderable => SourceFont && (Scale != 0);
+        public bool IsRenderable => SourceFont && (PointSize != 0);
 
         public NumberFont NumberFont { get; private set; }
 
         private static Material _fontRenderMaterial;
-        private static Material FontRenderMaterial
+        private static Material GetFontRenderMaterial(Material prototype)
         {
-            get
+            if (!_fontRenderMaterial)
             {
-                if (!_fontRenderMaterial)
-                {
-                    _fontRenderMaterial = new Material(Shader.Find("TextMeshPro/Bitmap"));
-                }
-                return _fontRenderMaterial;
+                _fontRenderMaterial = new Material(prototype);
             }
+            return _fontRenderMaterial;
         }
 
         private static Material _fontRotateMaterial;
@@ -66,18 +71,21 @@ namespace NumberManager.Editor
             }
         }
 
+        private const int ATLAS_SUPER_SCALE = 4;
+        private const int FONT_CHAR_PADDING = 1;
+
         private Vector2Int GetScaledAtlasSizeInternal(TMP_FontAsset tmpFont)
         {
-            int scaledWidth = Mathf.CeilToInt(tmpFont.atlasWidth * Scale);
-            int scaledHeight = Mathf.CeilToInt(tmpFont.atlasHeight * Scale);
-            return new Vector2Int(scaledWidth, scaledHeight);
+            //int scaledWidth = Mathf.CeilToInt(tmpFont.atlasWidth * Scale);
+            //int scaledHeight = Mathf.CeilToInt(tmpFont.atlasHeight * Scale);
+            return new Vector2Int(tmpFont.atlasWidth / ATLAS_SUPER_SCALE, tmpFont.atlasHeight / ATLAS_SUPER_SCALE);
         }
 
         public Vector2Int GetRotatedAtlasSize()
         {
             if (IsRenderable)
             {
-                var tmpFont = GetTmpFont(SourceFont);
+                var tmpFont = GetTmpFont();
                 var scaled = GetScaledAtlasSizeInternal(tmpFont);
                 var rotateProps = FontRotationProps.Get(Rotation);
                 return rotateProps.GetRotatedTexSize(scaled);
@@ -92,7 +100,7 @@ namespace NumberManager.Editor
         {
             if (!IsRenderable) return Texture2D.blackTexture;
 
-            var tmpFont = GetTmpFont(SourceFont);
+            var tmpFont = GetTmpFont();
             
             var scaledSize = GetScaledAtlasSizeInternal(tmpFont);
             var rotateProps = FontRotationProps.Get(Rotation);
@@ -100,33 +108,38 @@ namespace NumberManager.Editor
 
             RenderTexture previous = RenderTexture.active;
 
-            // grab temporary & clear
-            var scaledAtlas = RenderTexture.GetTemporary(scaledSize.x, scaledSize.y, 16, RenderTextureFormat.ARGB32);
+            // Apply font shader
+            var superAtlas = RenderTexture.GetTemporary(tmpFont.atlasWidth, tmpFont.atlasHeight, 0, RenderTextureFormat.ARGB32);
+            RenderTexture.active = superAtlas;
+            GL.Clear(true, true, Color.clear);
 
-            // Apply font shader & scale
+            var fontMaterial = GetFontRenderMaterial(tmpFont.material);
+            fontMaterial.SetColor(ShaderUtilities.ID_FaceColor, Color);
+
+            Graphics.Blit(tmpFont.atlasTexture, superAtlas, fontMaterial);
+
+            // Apply scale
+            var scaledAtlas = RenderTexture.GetTemporary(scaledSize.x, scaledSize.y, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Default, 8);
             RenderTexture.active = scaledAtlas;
             GL.Clear(true, true, Color.clear);
 
-            //FontRenderMaterial.SetTexture(ShaderUtilities.ID_MainTex, tmpFont.atlasTexture);
-            //FontRenderMaterial.SetColor(ShaderUtilities.ID_FaceColor, Color);
-            
-            Graphics.Blit(tmpFont.atlasTexture, scaledAtlas, tmpFont.material);
+            Graphics.Blit(superAtlas, scaledAtlas);
 
             // Apply atlas transform
-            var rotatedAtlas = RenderTexture.GetTemporary(rotatedSize.x, rotatedSize.y, 16, RenderTextureFormat.ARGB32);
+            var rotatedAtlas = RenderTexture.GetTemporary(rotatedSize.x, rotatedSize.y, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Default, 8);
             RenderTexture.active = rotatedAtlas;
             GL.Clear(true, true, Color.clear);
 
             rotateProps.ApplyTo(RotateMaterial);
             Graphics.Blit(scaledAtlas, rotatedAtlas, RotateMaterial);
 
-            // Save atlas to temporary texture
-            var tex = new Texture2D(rotatedSize.x, rotatedSize.y, TextureFormat.ARGB32, true);
+            var tex = new Texture2D(rotatedSize.x, rotatedSize.y, TextureFormat.ARGB32, 0, false);
 
             tex.ReadPixels(new Rect(0, 0, rotatedSize.x, rotatedSize.y), 0, 0);
             tex.Apply();
 
             RenderTexture.active = previous;
+            RenderTexture.ReleaseTemporary(superAtlas);
             RenderTexture.ReleaseTemporary(scaledAtlas);
             RenderTexture.ReleaseTemporary(rotatedAtlas);
 
@@ -137,21 +150,21 @@ namespace NumberManager.Editor
         {
             NumberFont = new NumberFont()
             {
-                CharXArr = new int[10],
-                CharYArr = new int[10],
-                CharWidthArr = new int[10],
+                CharXArr = new int[10 + ExtraChararacters.Length],
+                CharYArr = new int[10 + ExtraChararacters.Length],
+                CharWidthArr = new int[10 + ExtraChararacters.Length],
             };
 
             if (!IsRenderable) return;
 
-            var tmpFont = GetTmpFont(SourceFont);
+            var tmpFont = GetTmpFont();
             var rotateProps = FontRotationProps.Get(Rotation);
             var atlasSize = GetScaledAtlasSizeInternal(tmpFont);
             atlasSize = rotateProps.GetRotatedTexSize(atlasSize);
 
             char[] digits = "0123456789".ToCharArray();
 
-            float maxHeight = 0;
+            int maxHeight = 0;
             for (int i = 0; i < 10; i++)
             {
                 var character = tmpFont.characterLookupTable[digits[i]];
@@ -163,19 +176,46 @@ namespace NumberManager.Editor
                 }
 
                 var charCoords = rotateProps.GetRotatedGlyphCoordinates(
-                    Mathf.CeilToInt(glyph.glyphRect.x * Scale),
-                    Mathf.CeilToInt(glyph.glyphRect.y * Scale),
-                    Mathf.CeilToInt(glyph.glyphRect.width * Scale),
-                    Mathf.CeilToInt(glyph.glyphRect.height * Scale),
+                    Mathf.CeilToInt(glyph.glyphRect.x / (float)ATLAS_SUPER_SCALE),
+                    Mathf.CeilToInt(glyph.glyphRect.y / (float)ATLAS_SUPER_SCALE),
+                    Mathf.CeilToInt(glyph.glyphRect.width / (float)ATLAS_SUPER_SCALE),
+                    Mathf.CeilToInt(glyph.glyphRect.height / (float)ATLAS_SUPER_SCALE),
                     atlasSize
                 );
 
-                NumberFont.CharXArr[i] = offset.x + charCoords.x;
-                NumberFont.CharYArr[i] = charCoords.y + offset.y - atlasSize.y;
-                NumberFont.CharWidthArr[i] = Mathf.CeilToInt(glyph.glyphRect.width * Scale);
+                NumberFont.CharXArr[i] = offset.x + charCoords.x - FONT_CHAR_PADDING;
+                NumberFont.CharYArr[i] = charCoords.y + offset.y - atlasSize.y + FONT_CHAR_PADDING;
+                NumberFont.CharWidthArr[i] = Mathf.CeilToInt(glyph.glyphRect.width / (float)ATLAS_SUPER_SCALE) + 2 * FONT_CHAR_PADDING;
             }
 
-            NumberFont.Height = Mathf.CeilToInt(maxHeight * Scale);
+            NumberFont.ExtraChars = new ExtraChar[ExtraChararacters.Length];
+            for (int i = 0; i < ExtraChararacters.Length; i++)
+            {
+                var character = tmpFont.characterLookupTable[ExtraChararacters[i]];
+                var glyph = tmpFont.glyphLookupTable[character.glyphIndex];
+
+                var charCoords = rotateProps.GetRotatedGlyphCoordinates(
+                    Mathf.CeilToInt(glyph.glyphRect.x / (float)ATLAS_SUPER_SCALE),
+                    Mathf.CeilToInt(glyph.glyphRect.y / (float)ATLAS_SUPER_SCALE),
+                    Mathf.CeilToInt(glyph.glyphRect.width / (float)ATLAS_SUPER_SCALE),
+                    Mathf.CeilToInt(glyph.glyphRect.height / (float)ATLAS_SUPER_SCALE),
+                    atlasSize
+                );
+
+                NumberFont.ExtraChars[i] = new ExtraChar()
+                {
+                    Char = ExtraChararacters[i],
+                    X = offset.x + charCoords.x - FONT_CHAR_PADDING,
+                    Y = charCoords.y + offset.y - atlasSize.y + FONT_CHAR_PADDING,
+                    Width = Mathf.CeilToInt(glyph.glyphRect.width / (float)ATLAS_SUPER_SCALE) + 2 * FONT_CHAR_PADDING,
+                };
+
+                NumberFont.CharXArr[i + 10] = NumberFont.ExtraChars[i].X;
+                NumberFont.CharYArr[i + 10] = NumberFont.ExtraChars[i].Y;
+                NumberFont.CharWidthArr[i + 10] = NumberFont.ExtraChars[i].Width;
+            }
+
+            NumberFont.Height = Mathf.CeilToInt(maxHeight / (float)ATLAS_SUPER_SCALE) + 2 * FONT_CHAR_PADDING;
             NumberFont.Orientation = rotateProps.FontOrientation;
             NumberFont.Kerning = Kerning;
             NumberFont.Format = Format;
@@ -186,23 +226,73 @@ namespace NumberManager.Editor
 
         #region Static Functions
 
-        private static readonly Dictionary<Font, TMP_FontAsset> _fontCache = new Dictionary<Font, TMP_FontAsset>();
-
-        private static TMP_FontAsset GetTmpFont(Font unityFont)
+        private class TmpFontWrapper
         {
-            if (_fontCache.TryGetValue(unityFont, out var tmpFont))
+            public string Key;
+            public readonly TMP_FontAsset TmpFont;
+
+            private LinkedList<FontProvider> _subscribers = new LinkedList<FontProvider>();
+
+            public TmpFontWrapper(string key, TMP_FontAsset tmpFont)
             {
-                return tmpFont;
+                Key = key;
+                TmpFont = tmpFont;
             }
 
-            tmpFont = TMP_FontAsset.CreateFontAsset(unityFont, 128, 4, 
-                GlyphRenderMode.SDFAA_HINTED, 512, 512, 
+            public bool IsUnused => _subscribers.Count == 0;
+
+            public void Subscribe(FontProvider subscriber)
+            {
+                if (!_subscribers.Contains(subscriber))
+                {
+                    _subscribers.AddLast(subscriber);
+                }
+            }
+
+            public void Unsubscribe(FontProvider subscriber)
+            {
+                _subscribers.Remove(subscriber);
+            }
+        }
+
+        private static readonly LinkedList<TmpFontWrapper> _fontCache = new LinkedList<TmpFontWrapper>();
+
+        private TMP_FontAsset GetTmpFont()
+        {
+            string key = $"{SourceFont.name}_{PointSize}_{ExtraChararacters}";
+
+            var node = _fontCache.First;
+            while (node != null)
+            {
+                if (node.Value.Key == key)
+                {
+                    node.Value.Subscribe(this);
+                    return node.Value.TmpFont;
+                }
+
+                var next = node.Next;
+                if (node.Value.IsUnused)
+                {
+                    _fontCache.Remove(node);
+                }
+                node = next;
+            }
+
+            int padding = Math.Max(Mathf.CeilToInt(PointSize / 15f * ATLAS_SUPER_SCALE), FONT_CHAR_PADDING);
+            int atlasDimension = (PointSize + padding) * 3 * ATLAS_SUPER_SCALE;
+
+            var tmpFont = TMP_FontAsset.CreateFontAsset(SourceFont, PointSize * ATLAS_SUPER_SCALE, padding, 
+                GlyphRenderMode.SDFAA_HINTED, atlasDimension, atlasDimension,
                 AtlasPopulationMode.Dynamic, false);
 
             tmpFont.TryAddCharacters("0123456789");
+            if (!string.IsNullOrEmpty(ExtraChararacters))
+            {
+                tmpFont.TryAddCharacters(ExtraChararacters);
+            }
             tmpFont.atlasPopulationMode = AtlasPopulationMode.Static;
 
-            _fontCache.Add(unityFont, tmpFont);
+            _fontCache.AddLast(new TmpFontWrapper(key, tmpFont));
             return tmpFont;
         }
 

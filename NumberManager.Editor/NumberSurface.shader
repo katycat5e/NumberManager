@@ -1,4 +1,4 @@
-﻿Shader "Custom/NumberSurface"
+﻿Shader"Custom/NumberSurface"
 {
     Properties
     {
@@ -10,6 +10,7 @@
         _EmissionMap( "Emission", 2D ) = "black" {}
         _FontEmission( "Font Emission", 2D ) = "black" {}
         _BlendMode( "Blending Mode", Int ) = 0
+        __ColorizeWhiteLvl( "Colorize White Level", Float ) = 1.0
     }
     SubShader
     {
@@ -46,6 +47,8 @@
         #define BM_DIVIDE 4
         #define BM_COLORIZE 5
 
+        float _ColorizeWhiteLvl;
+
         // (MainTex UV space) digit boundaries
         float4 _DigitBounds[MAX_DIGITS];
         // (FontTex uv space) digit src bottom left positions
@@ -70,7 +73,7 @@
         {
             fixed4 outCol = tex2D( _MainTex, IN.uv_MainTex );
             half4 spec = tex2D( _MetallicGlossMap, IN.uv_MainTex );
-            half3 emit = GammaToLinearSpace( tex2D( _EmissionMap, IN.uv_MainTex ) );
+            half3 emit = tex2D( _EmissionMap, IN.uv_MainTex );
 
             //spec = half4(GammaToLinearSpace( spec ), spec.a);
 
@@ -122,8 +125,9 @@
 
                     case BM_COLORIZE:
                         // convert base texture to grayscale, then add font color
-                        fixed baseGray = dot(outCol.rgb, fixed3(0.2126, 0.7152, 0.0722));
-                        outCol = (outCol * (1 - fCol.a)) + (fColP * baseGray);
+                        // scale down gray range, shift to +- around zero & add
+					    fixed baseGray = clamp(dot(outCol.rgb, fixed3(0.2126, 0.7152, 0.0722)) / _ColorizeWhiteLvl, 0, 1);
+					    outCol = (outCol * (1 - fCol.a)) + (fCol * baseGray);
                         break;
 
                     default:

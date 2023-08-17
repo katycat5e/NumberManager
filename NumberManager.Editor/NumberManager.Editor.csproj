@@ -26,6 +26,7 @@
 	<Reference Include="UnityEngine.ImageConversionModule" />
     <Reference Include="UnityEngine.TextCoreModule" />
     <Reference Include="UnityEngine.TextRenderingModule" />
+    <Reference Include="UnityEngine.PhysicsModule" />
 	<Reference Include="Unity.TextMeshPro" />
   </ItemGroup>
 
@@ -33,5 +34,12 @@
     <None Update="NumberSurface.shader">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="RotateFragment.shader">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
+
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <Exec Command="setlocal enableextensions&#xD;&#xA;if not exist &quot;$(SolutionDir)$(OutDir)&quot; md &quot;$(SolutionDir)$(OutDir)&quot;&#xD;&#xA;endlocal&#xD;&#xA;xcopy /d /y &quot;$(TargetPath)&quot; &quot;$(SolutionDir)$(OutDir)&quot;&#xD;&#xA;xcopy /d /y &quot;$(ProjectDir)$(OutDir)NumberSurface.shader&quot; &quot;$(SolutionDir)$(OutDir)&quot;&#xD;&#xA;xcopy /d /y &quot;$(ProjectDir)$(OutDir)RotateFragment.shader&quot; &quot;$(SolutionDir)$(OutDir)&quot;" />
+  </Target>
 </Project>

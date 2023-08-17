@@ -11,7 +11,7 @@
     {
         Tags { "Queue" = "Transparent" "IgnoreProjector"="True" "RenderType"="Transparent" }
         ZWrite Off
-        Blend SrcAlpha OneMinusSrcAlpha
+        //Blend SrcAlpha OneMinusSrcAlpha
         LOD 200
 
         Pass
@@ -19,6 +19,8 @@
             CGPROGRAM
             #pragma vertex vert alpha
             #pragma fragment frag alpha
+
+            #pragma target 3.0
 
             #include "UnityCG.cginc"
 

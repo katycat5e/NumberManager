@@ -160,6 +160,7 @@ namespace NumberManager.Shared
                 DigitUV = digitUV,
                 FontTransform = transform,
                 BlendMode = scheme.BlendMode,
+                ColorizeWhiteLevel = scheme.ColorizeWhiteLevel,
                 Emission = emission,
                 UseEmission = useEmit,
                 Specular = specular,

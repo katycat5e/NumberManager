@@ -294,7 +294,7 @@ namespace NumberManager.Mod
                 }
                 catch (Exception ex)
                 {
-                    modEntry.Logger.Error($"Exception when loading numbering config for {skin.Name}:\n{ex.Message}");
+                    modEntry.Logger.Error($"Exception when loading numbering config for {skin.Name}:\n{ex}");
                 }
             }
 
