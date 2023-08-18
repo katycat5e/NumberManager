@@ -423,7 +423,7 @@ namespace NumberManager.Mod
 
             // Check if the texture we're targeting is supplied by the skin
             var skin = SkinProvider.FindSkinByName(numScheme.LiveryId, numScheme.SkinName);
-            var tgtTex = skin.GetTexture(numScheme.TargetTexture)?.TextureData;
+            var tgtTex = skin?.GetTexture(numScheme.TargetTexture)?.TextureData;
             NumShaderProps? shaderProps = null;
 
             if (tgtTex != null)

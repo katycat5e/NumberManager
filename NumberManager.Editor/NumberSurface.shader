@@ -95,12 +95,10 @@
                     fixed4 fCol = tex2D( _FontTex, fontUV );
 
                     // blend emission & metal/gloss based on diffuse alpha
-                    if( _UseFEmit[i] ) emit = lerp( emit, _FontEmission[i].rgb, fCol.a );      // half3
-                    if( _UseFSpec[i] )
-                    {
-                        half4 sTemp = lerp( spec, _FontSpecular[i], fCol.a );
-                        spec = half4(sTemp.r, spec.g, 0, sTemp.a); // use base ao, ignore blue
-                    }
+                    emit = lerp( emit, _FontEmission[i].rgb, fCol.a * _UseFEmit[i] );      // half3
+                    
+                    half4 sTemp = lerp( spec, _FontSpecular[i], fCol.a * _UseFSpec[i] );
+                    spec = half4(sTemp.r, spec.g, 0, sTemp.a); // use base ao, ignore blue
 
                     // alpha-premultiplied overlay color
                     fixed4 fColP = fixed4(fCol.rgb * fCol.a, fCol.a);
