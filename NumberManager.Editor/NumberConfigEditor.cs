@@ -26,11 +26,13 @@ namespace NumberManager.Editor
         [Range(0, 1)]
         public float ColorizeWhiteLevel;
 
+        [Header("Random Numbers")]
         [Tooltip("Override car number setting and only use random numbers")]
         public bool ForceRandom = false;
         public int MinNumber = 1;
         public int MaxNumber = 9999;
 
+        [Header("Car ID Numbers")]
         [Tooltip("Offset added to car ID when using ID number generation")]
         public int Offset = 0;
 
@@ -46,6 +48,12 @@ namespace NumberManager.Editor
 
         private Texture2D _fontAtlas;
         private NumberConfig _numberConfig;
+
+        public void SetTargetTextureName(string textureName)
+        {
+            TargetTextureName = textureName;
+            _prevTargetTex = textureName;
+        }
 
         private string _prevTargetTex;
         private void OnValidate()
@@ -82,7 +90,7 @@ namespace NumberManager.Editor
             _numberConfig.MinNumber = MinNumber;
             _numberConfig.MaxNumber = MaxNumber;
             _numberConfig.BlendMode = BlendMode;
-            _numberConfig.ColorizeWhiteLevel = ColorizeWhiteLevel;
+            _numberConfig.ColorizeWhiteLevel = (BlendMode == FontBlendMode.Colorize) ? ColorizeWhiteLevel : 0;
             _numberConfig.ForceRandom = ForceRandom;
             _numberConfig.TargetTexture = TargetTextureName;
 

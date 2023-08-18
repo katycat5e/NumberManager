@@ -21,6 +21,7 @@
   <ItemGroup>
     <Reference Include="UnityEditor" />
     <Reference Include="UnityEngine" />
+	<Reference Include="UnityEngine.AssetBundleModule" />
 	<Reference Include="UnityEngine.CoreModule" />
 	<Reference Include="UnityEngine.IMGUIModule" />
 	<Reference Include="UnityEngine.ImageConversionModule" />
@@ -32,6 +33,9 @@
 
   <ItemGroup>
     <None Update="NumberSurface.shader">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="ScaleFragment.shader">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="RotateFragment.shader">

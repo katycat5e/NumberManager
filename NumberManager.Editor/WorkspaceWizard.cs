@@ -191,8 +191,8 @@ namespace NumberManager.Editor
             var editor = previewPlane.AddComponent<NumberConfigEditor>();
             editor.TargetRenderer = planeRenderer;
             editor.DisplayNumber = 1234;
-            editor.TargetTextureName = Path.GetFileNameWithoutExtension(textureFileName);
-
+            editor.SetTargetTextureName(Path.GetFileNameWithoutExtension(textureFileName));
+            
             EditorSceneManager.SaveScene(scene, scenePath);
             Selection.activeObject = previewPlane;
         }

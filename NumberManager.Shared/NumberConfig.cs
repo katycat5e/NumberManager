@@ -2,6 +2,7 @@
 //using SMShared;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Xml.Serialization;
@@ -27,6 +28,7 @@ namespace NumberManager.Shared
         public FontBlendMode BlendMode = FontBlendMode.Normal;
 
         [XmlAttribute]
+        [DefaultValue(0)]
         public float ColorizeWhiteLevel = 1;
 
         public NumberFont[] Fonts;
@@ -175,6 +177,7 @@ namespace NumberManager.Shared
     {
         // Character Properties
         [XmlAttribute]
+        [DefaultValue(0)]
         public int Height;
 
         [XmlAttribute]
@@ -189,9 +192,16 @@ namespace NumberManager.Shared
         [XmlAttribute]
         public string Format = "{0:D1}";
 
-        private int[] ParseIntArray(string s, string dbgName, IEnumerable<int> extraValues = null)
+        private int[] ParseIntArray(string s, string dbgName, IEnumerable<int> extraValues = null, bool allowNull = false)
         {
-            if (s == null) throw new ArgumentException($"{dbgName} attribute cannot be null");
+            if (s == null)
+            {
+                if (allowNull)
+                {
+                    return null;
+                }
+                throw new ArgumentException($"{dbgName} attribute cannot be null");
+            }
 
             try
             {
@@ -243,6 +253,17 @@ namespace NumberManager.Shared
         [XmlIgnore]
         public int[] CharWidthArr { get; set; }
 
+        [XmlAttribute(AttributeName = "CharHeight")]
+        public string CharHeightString;
+
+        [XmlIgnore]
+        public int[] CharHeightArr { get; set; }
+
+        public int GetCharHeight(int index)
+        {
+            return CharHeightArr?[index] ?? Height;
+        }
+
         [XmlAttribute(AttributeName = "CharX")]
         public string CharXString = null;
 
@@ -271,15 +292,19 @@ namespace NumberManager.Shared
         public void Initialize()
         {
             CharWidthArr = ParseIntArray(CharWidthString, "CharWidth", ExtraChars?.Select(e => e.Width));
+            CharHeightArr = ParseIntArray(CharHeightString, "CharHeight", ExtraChars?.Select(e => e.Height), true);
             CharXArr = ParseIntArray(CharXString, "CharX", ExtraChars?.Select(e => e.X));
             CharYArr = ParseIntArray(CharYString, "CharY", ExtraChars?.Select(e => e.Y));
 
             EmissionColor = ParseColor(EmissionString, "Emission");
             SpecularColor = ParseColor(SpecularString, "Specular");
 
-            foreach (var c in ExtraChars)
+            if (ExtraChars != null)
             {
-                c.Initialize();
+                foreach (var c in ExtraChars)
+                {
+                    c.Initialize();
+                }
             }
         }
 
@@ -288,6 +313,7 @@ namespace NumberManager.Shared
             CharXString = string.Join(",", CharXArr.Take(10));
             CharYString = string.Join(",", CharYArr.Take(10));
             CharWidthString = string.Join(",", CharWidthArr.Take(10));
+            CharHeightString = string.Join(",", CharHeightArr.Take(10));
 
             if (EmissionColor.HasValue)
             {
@@ -332,6 +358,9 @@ namespace NumberManager.Shared
 
         [XmlAttribute]
         public int Width;
+
+        [XmlAttribute]
+        public int Height;
 
         public void Initialize()
         {

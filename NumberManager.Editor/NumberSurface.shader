@@ -1,4 +1,4 @@
-﻿Shader"Custom/NumberSurface"
+﻿Shader "Custom/NumberSurface"
 {
     Properties
     {
@@ -10,7 +10,7 @@
         _EmissionMap( "Emission", 2D ) = "black" {}
         _FontEmission( "Font Emission", 2D ) = "black" {}
         _BlendMode( "Blending Mode", Int ) = 0
-        __ColorizeWhiteLvl( "Colorize White Level", Float ) = 1.0
+        _ColorizeWhiteLvl( "Colorize White Level", Float ) = 1.0
     }
     SubShader
     {
@@ -73,7 +73,7 @@
         {
             fixed4 outCol = tex2D( _MainTex, IN.uv_MainTex );
             half4 spec = tex2D( _MetallicGlossMap, IN.uv_MainTex );
-            half3 emit = tex2D( _EmissionMap, IN.uv_MainTex );
+            half3 emit = GammaToLinearSpace( tex2D( _EmissionMap, IN.uv_MainTex ) );
 
             //spec = half4(GammaToLinearSpace( spec ), spec.a);
 

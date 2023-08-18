@@ -11,7 +11,21 @@ namespace NumberManager.Shared
         // Split the given integer into its decimal digits
         private static int[] GetDigits(NumberFont font, int number)
         {
-            var formatted = string.Format(font.Format, number).ToCharArray();
+            char[] formatted = null;
+            if (!string.IsNullOrEmpty(font.Format))
+            {
+                try
+                {
+                    formatted = string.Format(font.Format, number).ToCharArray();
+                }
+                catch (FormatException)
+                {
+                    formatted = null;
+                }
+            }
+
+            formatted ??= $"{number:D1}".ToCharArray();
+
             var digits = formatted.Select(c =>
             {
                 // numeric digit
@@ -94,19 +108,15 @@ namespace NumberManager.Shared
                 // sum of char widths + (kerning * (nDigits - 1))
                 int numberWidth = adjustedDigits.Select(d => font.CharWidthArr[d] + font.Kerning).Sum() - font.Kerning; // in pixels
 
-                int mainStart, mainEnd, transStart, transEnd;
+                int mainStart, mainEnd;
 
                 if( font.Orientation == NumOrientation.Horizontal )
                 {
                     mainStart = attachPoint.X - (numberWidth / 2);
-                    transStart = (height - attachPoint.Y) - (font.Height / 2);
-                    transEnd = transStart + font.Height;
                 }
                 else
                 {
                     mainStart = (height - attachPoint.Y) - (numberWidth / 2);
-                    transStart = attachPoint.X - (font.Height / 2);
-                    transEnd = transStart + font.Height;
                 }
 
                 // digit widths as MainTex uv distance
@@ -115,14 +125,21 @@ namespace NumberManager.Shared
                     mainEnd = mainStart + font.CharWidthArr[d];
                     int nextMain = mainEnd + font.Kerning;
 
+                    int charHeight = font.GetCharHeight(d);
+                    int transStart, transEnd;
+
                     if( font.Orientation == NumOrientation.Horizontal )
                     {
                         // main axis = X, transverse axis = Y
+                        transStart = (height - attachPoint.Y) - (charHeight / 2);
+                        transEnd = transStart + charHeight;
                         digitBounds[digitIdx] = GetUVBounds(mainStart, transStart, mainEnd, transEnd, mainSize);
                     }
                     else
                     {
                         // main axis = Y, transverse axis = X
+                        transStart = attachPoint.X - (charHeight / 2);
+                        transEnd = transStart + charHeight;
                         digitBounds[digitIdx] = GetUVBounds(transStart, mainStart, transEnd, mainEnd, mainSize);
                     }
 

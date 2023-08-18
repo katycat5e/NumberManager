@@ -17,6 +17,7 @@ namespace NumberManager.Mod
     public static partial class NumberManager
     {
         public const string NUM_CONFIG_FILE = "numbering.xml";
+        private const string NUM_SHADER_PATH = "Assets/NumberManager/NumberSurface.shader";
 
         internal static UnityModManager.ModEntry modEntry = null!;
         private static UnityModManager.ModEntry skinManagerEntry = null!;
@@ -81,7 +82,7 @@ namespace NumberManager.Mod
 
             if( NumberingBundle != null )
             {
-                NumShader = NumberingBundle.LoadAsset<Shader>("Assets/NumberSurface.shader");
+                NumShader = NumberingBundle.LoadAsset<Shader>(NUM_SHADER_PATH);
                 if( NumShader == null )
                 {
                     modEntry.Logger.Error("Failed to load numbering shader from asset bundle");
@@ -294,7 +295,7 @@ namespace NumberManager.Mod
                 }
                 catch (Exception ex)
                 {
-                    modEntry.Logger.Error($"Exception when loading numbering config for {skin.Name}:\n{ex}");
+                    modEntry.Logger.Error($"Exception when initializing numbering config for {carType.id}/{skin.Name}:\n{ex}");
                 }
             }
 
@@ -386,7 +387,7 @@ namespace NumberManager.Mod
             if( NumShader == null )
             {
                 if( NumberingBundle == null ) NumberingBundle = AssetBundle.LoadFromMemory(NumberingBundleData);
-                NumShader = NumberingBundle.LoadAsset<Shader>("Assets/NumberSurface.shader");
+                NumShader = NumberingBundle.LoadAsset<Shader>(NUM_SHADER_PATH);
             }
 
             if( (numScheme == null) || (NumShader == null) )

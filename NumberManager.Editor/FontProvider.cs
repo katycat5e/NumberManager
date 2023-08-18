@@ -1,8 +1,11 @@
 ﻿using NumberManager.Shared;
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using TMPro;
 using UnityEngine;
+using UnityEngine.Rendering;
 using UnityEngine.TextCore.LowLevel;
 
 namespace NumberManager.Editor
@@ -22,13 +25,16 @@ namespace NumberManager.Editor
         [SourceFont]
         public Font SourceFont;
 
+        [Tooltip("Size of digits")]
         [Min(1)]
         public int PointSize = 90;
         public FontRotation Rotation;
+        [Tooltip("Extra pixels added between digits")]
+        [Min(0)]
         public int Kerning;
-        public string ExtraChararacters;
 
         [Header("Style")]
+        [Tooltip("Format string to apply to number before printing, Default = {0:D1}")]
         public string Format = "{0:D1}";
         public Color Color = Color.white;
 
@@ -118,29 +124,27 @@ namespace NumberManager.Editor
 
             Graphics.Blit(tmpFont.atlasTexture, superAtlas, fontMaterial);
 
-            // Apply scale
-            var scaledAtlas = RenderTexture.GetTemporary(scaledSize.x, scaledSize.y, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Default, 8);
-            RenderTexture.active = scaledAtlas;
-            GL.Clear(true, true, Color.clear);
-
-            Graphics.Blit(superAtlas, scaledAtlas);
+            // generate scaling data for atlas texture
+            var superTexture = new Texture2D(tmpFont.atlasWidth, tmpFont.atlasHeight, TextureFormat.ARGB32, true);
+            superTexture.ReadPixels(new Rect(0, 0, tmpFont.atlasWidth, tmpFont.atlasHeight), 0, 0, true);
+            superTexture.filterMode = FilterMode.Trilinear;
+            superTexture.Apply();
 
             // Apply atlas transform
-            var rotatedAtlas = RenderTexture.GetTemporary(rotatedSize.x, rotatedSize.y, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Default, 8);
+            var rotatedAtlas = RenderTexture.GetTemporary(rotatedSize.x, rotatedSize.y, 0, RenderTextureFormat.ARGB32);
             RenderTexture.active = rotatedAtlas;
             GL.Clear(true, true, Color.clear);
 
             rotateProps.ApplyTo(RotateMaterial);
-            Graphics.Blit(scaledAtlas, rotatedAtlas, RotateMaterial);
+            Graphics.Blit(superTexture, rotatedAtlas, RotateMaterial);
 
-            var tex = new Texture2D(rotatedSize.x, rotatedSize.y, TextureFormat.ARGB32, 0, false);
+            var tex = new Texture2D(rotatedSize.x, rotatedSize.y, TextureFormat.ARGB32, false);
 
-            tex.ReadPixels(new Rect(0, 0, rotatedSize.x, rotatedSize.y), 0, 0);
+            tex.ReadPixels(new Rect(0, 0, rotatedSize.x, rotatedSize.y), 0, 0, false);
             tex.Apply();
 
             RenderTexture.active = previous;
             RenderTexture.ReleaseTemporary(superAtlas);
-            RenderTexture.ReleaseTemporary(scaledAtlas);
             RenderTexture.ReleaseTemporary(rotatedAtlas);
 
             return tex;
@@ -148,11 +152,22 @@ namespace NumberManager.Editor
 
         public void CreateFontSettings(Vector2Int offset)
         {
+            char[] extraChars;
+            try
+            {
+                extraChars = string.Format(Format, 1234567890).Where(c => !char.IsDigit(c)).Distinct().ToArray();
+            }
+            catch (FormatException)
+            {
+                extraChars = "{0:D1}".ToCharArray();
+            }
+
             NumberFont = new NumberFont()
             {
-                CharXArr = new int[10 + ExtraChararacters.Length],
-                CharYArr = new int[10 + ExtraChararacters.Length],
-                CharWidthArr = new int[10 + ExtraChararacters.Length],
+                CharXArr = new int[10 + extraChars.Length],
+                CharYArr = new int[10 + extraChars.Length],
+                CharWidthArr = new int[10 + extraChars.Length],
+                CharHeightArr = new int[10 + extraChars.Length],
             };
 
             if (!IsRenderable) return;
@@ -164,58 +179,55 @@ namespace NumberManager.Editor
 
             char[] digits = "0123456789".ToCharArray();
 
-            int maxHeight = 0;
             for (int i = 0; i < 10; i++)
             {
                 var character = tmpFont.characterLookupTable[digits[i]];
                 var glyph = tmpFont.glyphLookupTable[character.glyphIndex];
 
-                if (glyph.glyphRect.height > maxHeight)
-                {
-                    maxHeight = glyph.glyphRect.height;
-                }
-
                 var charCoords = rotateProps.GetRotatedGlyphCoordinates(
-                    Mathf.CeilToInt(glyph.glyphRect.x / (float)ATLAS_SUPER_SCALE),
-                    Mathf.CeilToInt(glyph.glyphRect.y / (float)ATLAS_SUPER_SCALE),
-                    Mathf.CeilToInt(glyph.glyphRect.width / (float)ATLAS_SUPER_SCALE),
-                    Mathf.CeilToInt(glyph.glyphRect.height / (float)ATLAS_SUPER_SCALE),
+                    glyph.glyphRect.x / ATLAS_SUPER_SCALE,
+                    glyph.glyphRect.y / ATLAS_SUPER_SCALE,
+                    glyph.glyphRect.width / ATLAS_SUPER_SCALE,
+                    glyph.glyphRect.height / ATLAS_SUPER_SCALE,
                     atlasSize
                 );
 
                 NumberFont.CharXArr[i] = offset.x + charCoords.x - FONT_CHAR_PADDING;
                 NumberFont.CharYArr[i] = charCoords.y + offset.y - atlasSize.y + FONT_CHAR_PADDING;
-                NumberFont.CharWidthArr[i] = Mathf.CeilToInt(glyph.glyphRect.width / (float)ATLAS_SUPER_SCALE) + 2 * FONT_CHAR_PADDING;
+                NumberFont.CharWidthArr[i] = glyph.glyphRect.width / ATLAS_SUPER_SCALE + 2 * FONT_CHAR_PADDING;
+                NumberFont.CharHeightArr[i] = glyph.glyphRect.height / ATLAS_SUPER_SCALE + 2 * FONT_CHAR_PADDING;
             }
 
-            NumberFont.ExtraChars = new ExtraChar[ExtraChararacters.Length];
-            for (int i = 0; i < ExtraChararacters.Length; i++)
+            NumberFont.ExtraChars = new ExtraChar[extraChars.Length];
+            for (int i = 0; i < extraChars.Length; i++)
             {
-                var character = tmpFont.characterLookupTable[ExtraChararacters[i]];
+                var character = tmpFont.characterLookupTable[extraChars[i]];
                 var glyph = tmpFont.glyphLookupTable[character.glyphIndex];
 
                 var charCoords = rotateProps.GetRotatedGlyphCoordinates(
-                    Mathf.CeilToInt(glyph.glyphRect.x / (float)ATLAS_SUPER_SCALE),
-                    Mathf.CeilToInt(glyph.glyphRect.y / (float)ATLAS_SUPER_SCALE),
-                    Mathf.CeilToInt(glyph.glyphRect.width / (float)ATLAS_SUPER_SCALE),
-                    Mathf.CeilToInt(glyph.glyphRect.height / (float)ATLAS_SUPER_SCALE),
+                    glyph.glyphRect.x / ATLAS_SUPER_SCALE,
+                    glyph.glyphRect.y / ATLAS_SUPER_SCALE,
+                    glyph.glyphRect.width / ATLAS_SUPER_SCALE,
+                    glyph.glyphRect.height / ATLAS_SUPER_SCALE,
                     atlasSize
                 );
 
                 NumberFont.ExtraChars[i] = new ExtraChar()
                 {
-                    Char = ExtraChararacters[i],
+                    Char = extraChars[i],
                     X = offset.x + charCoords.x - FONT_CHAR_PADDING,
                     Y = charCoords.y + offset.y - atlasSize.y + FONT_CHAR_PADDING,
-                    Width = Mathf.CeilToInt(glyph.glyphRect.width / (float)ATLAS_SUPER_SCALE) + 2 * FONT_CHAR_PADDING,
+                    Width = glyph.glyphRect.width / ATLAS_SUPER_SCALE + 2 * FONT_CHAR_PADDING,
+                    Height = glyph.glyphRect.height / ATLAS_SUPER_SCALE + 2 * FONT_CHAR_PADDING,
                 };
 
                 NumberFont.CharXArr[i + 10] = NumberFont.ExtraChars[i].X;
                 NumberFont.CharYArr[i + 10] = NumberFont.ExtraChars[i].Y;
                 NumberFont.CharWidthArr[i + 10] = NumberFont.ExtraChars[i].Width;
+                NumberFont.CharHeightArr[i + 10] = NumberFont.ExtraChars[i].Height;
             }
 
-            NumberFont.Height = Mathf.CeilToInt(maxHeight / (float)ATLAS_SUPER_SCALE) + 2 * FONT_CHAR_PADDING;
+            NumberFont.Height = 0;
             NumberFont.Orientation = rotateProps.FontOrientation;
             NumberFont.Kerning = Kerning;
             NumberFont.Format = Format;
@@ -259,7 +271,17 @@ namespace NumberManager.Editor
 
         private TMP_FontAsset GetTmpFont()
         {
-            string key = $"{SourceFont.name}_{PointSize}_{ExtraChararacters}";
+            string extraChars;
+            try
+            {
+                extraChars = string.Concat(string.Format(Format, 1234567890).Where(c => !char.IsDigit(c)).Distinct());
+            }
+            catch (FormatException)
+            {
+                extraChars = "{0:D1}";
+            }
+
+            string key = $"{SourceFont.name}_{PointSize}_{extraChars}";
 
             var node = _fontCache.First;
             while (node != null)
@@ -286,9 +308,9 @@ namespace NumberManager.Editor
                 AtlasPopulationMode.Dynamic, false);
 
             tmpFont.TryAddCharacters("0123456789");
-            if (!string.IsNullOrEmpty(ExtraChararacters))
+            if (!string.IsNullOrEmpty(extraChars))
             {
-                tmpFont.TryAddCharacters(ExtraChararacters);
+                tmpFont.TryAddCharacters(extraChars);
             }
             tmpFont.atlasPopulationMode = AtlasPopulationMode.Static;
 
