@@ -1,0 +1,49 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netframework4.8</TargetFramework>
+    <Nullable>disable</Nullable>
+	<LangVersion>8</LangVersion>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NumberManager.Shared\NumberManager.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="UnityEditor" />
+    <Reference Include="UnityEngine" />
+	<Reference Include="UnityEngine.AssetBundleModule" />
+	<Reference Include="UnityEngine.CoreModule" />
+	<Reference Include="UnityEngine.IMGUIModule" />
+	<Reference Include="UnityEngine.ImageConversionModule" />
+    <Reference Include="UnityEngine.TextCoreModule" />
+    <Reference Include="UnityEngine.TextRenderingModule" />
+    <Reference Include="UnityEngine.PhysicsModule" />
+	<Reference Include="Unity.TextMeshPro" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="NumberSurface.shader">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="ScaleFragment.shader">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="RotateFragment.shader">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <Exec Command="setlocal enableextensions&#xD;&#xA;if not exist &quot;$(SolutionDir)$(OutDir)&quot; md &quot;$(SolutionDir)$(OutDir)&quot;&#xD;&#xA;endlocal&#xD;&#xA;xcopy /d /y &quot;$(TargetPath)&quot; &quot;$(SolutionDir)$(OutDir)&quot;&#xD;&#xA;xcopy /d /y &quot;$(ProjectDir)$(OutDir)NumberSurface.shader&quot; &quot;$(SolutionDir)$(OutDir)&quot;&#xD;&#xA;xcopy /d /y &quot;$(ProjectDir)$(OutDir)RotateFragment.shader&quot; &quot;$(SolutionDir)$(OutDir)&quot;" />
+  </Target>
+</Project>
