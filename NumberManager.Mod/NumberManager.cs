@@ -101,6 +101,7 @@ namespace NumberManager.Mod
             }
 
             SkinProvider.SkinsLoaded += ReloadConfigs;
+            SkinProvider.SkinUpdated += ReloadNumbersForSkin;
 
             try
             {
@@ -115,9 +116,9 @@ namespace NumberManager.Mod
                 Terminal.Shell.AddCommand(command);
                 Terminal.Autocomplete.Register(command);
             }
-            catch
+            catch (Exception ex)
             {
-                modEntry.Logger.Error("Failed to register terminal commands");
+                modEntry.Logger.Error("Failed to register terminal commands: " + ex.ToString());
             }
 
             var harmony = new Harmony("cc.foxden.number_manager");
@@ -139,12 +140,42 @@ namespace NumberManager.Mod
 
         private static void ReapplyNumbers()
         {
-            var allCars = UnityEngine.Object.FindObjectsOfType<TrainCar>();
-            foreach (var car in allCars)
+            if (!CarSpawner.Instance) return;
+            foreach (var car in CarSpawner.Instance.AllCars)
             {
                 if (SavedCarNumbers.TryGetValue(car.CarGUID, out int num))
                 {
                     ApplyNumbering(car, num);
+                }
+            }
+        }
+
+        private static void ReloadNumbersForSkin(SkinConfig skin)
+        {
+            string key = GetSchemeKey(skin.CarId, skin.Name);
+            NumberSchemes.Remove(key);
+
+            var newConfig = LoadSchemeFromSkin(skin.Livery, skin.Skin);
+            if (newConfig != null)
+            {
+                ReapplyNumbersForUsers(newConfig);
+            }
+            modEntry.Logger.Log($"Reloaded number config for {skin.Name} {skin.CarId}");
+        }
+
+        private static void ReapplyNumbersForUsers(NumberConfig config)
+        {
+            if (!CarSpawner.Instance) return;
+            foreach (var car in CarSpawner.Instance.AllCars)
+            {
+                if (SkinManager.GetCurrentCarSkin(car, false) is Skin currentSkin)
+                {
+                    // do the livery check against the skin in case it's a DE6 skin on Slug etc
+                    if ((currentSkin.LiveryId == config.LiveryId) && (currentSkin.Name == config.SkinName))
+                    {
+                        int num = GetCurrentCarNumber(car);
+                        ApplyNumbering(car, num);
+                    }
                 }
             }
         }
