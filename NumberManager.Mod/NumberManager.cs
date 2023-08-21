@@ -103,6 +103,8 @@ namespace NumberManager.Mod
             SkinProvider.SkinsLoaded += ReloadConfigs;
             SkinProvider.SkinUpdated += ReloadNumbersForSkin;
 
+            ReloadConfigs();
+
             try
             {
                 var command = new CommandInfo()
