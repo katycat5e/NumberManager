@@ -65,10 +65,17 @@ namespace NumberManager.Editor
             foreach (string valueName in key.GetValueNames())
             {
                 string fontPath = key.GetValue(valueName) as string;
-                if (string.IsNullOrEmpty(fontPath) || (Path.GetExtension(fontPath).ToLower() != ".ttf"))
+                if (string.IsNullOrEmpty(fontPath))
                 {
                     continue;
                 }
+
+                string extension = Path.GetExtension(fontPath).ToLower();
+                if (!(extension == ".ttf" || extension == ".otf"))
+                {
+                    continue;
+                }
+
                 if (!Path.IsPathRooted(fontPath))
                 {
                     fontPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Fonts), fontPath);
@@ -76,7 +83,7 @@ namespace NumberManager.Editor
 
                 string fontName = valueName.Replace(" (TrueType)", string.Empty);
 
-                string assetPath = Path.Combine("Assets", FONTS_FOLDER, $"{fontName}.ttf");
+                string assetPath = Path.Combine("Assets", FONTS_FOLDER, $"{fontName}{extension}");
                 var fontAsset = AssetDatabase.LoadAssetAtPath<Font>(assetPath);
 
                 yield return new SystemFontInfo(fontName, fontPath, fontAsset);
@@ -139,7 +146,8 @@ namespace NumberManager.Editor
                 return;
             }
 
-            string fontAssetPath = Path.Combine("_FONTS", $"{selection.Name}.ttf");
+            string extension = Path.GetExtension(selection.Path).ToLower();
+            string fontAssetPath = Path.Combine("_FONTS", $"{selection.Name}{extension}");
             string targetPath = Path.Combine(Application.dataPath, fontAssetPath);
 
             File.Copy(selection.Path, targetPath, true);

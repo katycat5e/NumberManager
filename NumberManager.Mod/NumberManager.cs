@@ -105,24 +105,6 @@ namespace NumberManager.Mod
 
             ReloadConfigs();
 
-            try
-            {
-                var command = new CommandInfo()
-                {
-                    name = "NM.ReloadConfig",
-                    proc = ReloadConfigs,
-                    min_arg_count = 0,
-                    max_arg_count = 0,
-                    help = "Reload all number configs",
-                };
-                Terminal.Shell.AddCommand(command);
-                Terminal.Autocomplete.Register(command);
-            }
-            catch (Exception ex)
-            {
-                modEntry.Logger.Error("Failed to register terminal commands: " + ex.ToString());
-            }
-
             var harmony = new Harmony("cc.foxden.number_manager");
             harmony.PatchAll(System.Reflection.Assembly.GetExecutingAssembly());
 
@@ -138,6 +120,8 @@ namespace NumberManager.Mod
 
         private static void ReloadConfigs() => ReloadConfigs(true);
 
+
+        [RegisterCommand("NM.ReloadConfig", Help = "Reload all number configs", MinArgCount = 0, MaxArgCount = 0)]
         private static void ReloadConfigs(CommandArg[] args) => ReloadConfigs();
 
         private static void ReapplyNumbers()
@@ -162,7 +146,7 @@ namespace NumberManager.Mod
             {
                 ReapplyNumbersForUsers(newConfig);
             }
-            modEntry.Logger.Log($"Reloaded number config for {skin.Name} {skin.CarId}");
+            modEntry.Logger.Log($"Loaded number config for {skin.Name} {skin.CarId}");
         }
 
         private static void ReapplyNumbersForUsers(NumberConfig config)
@@ -192,6 +176,7 @@ namespace NumberManager.Mod
                 foreach (var skin in group.Skins.Where(s => !s.IsDefault))
                 {
                     LoadSchemeFromSkin(group.TrainCarType, skin);
+                    modEntry.Logger.Log($"Loaded number config for {skin.Name} {skin.LiveryId}");
                 }
             }
         }
