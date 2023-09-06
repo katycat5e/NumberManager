@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using DV.ThingTypes;
 using HarmonyLib;
 using Newtonsoft.Json.Linq;
+using NumberManager.Shared;
 using SkinManagerMod;
 using UnityEngine;
 
@@ -36,17 +38,59 @@ namespace NumberManager.Mod
             else return new DefaultTexInfo(null, 0, 0);
         }
 
-        internal static void Prefix( TrainCar trainCar, out Dictionary<MeshRenderer, DefaultTexInfo> __state )
+        internal static void Prefix( TrainCar trainCar, out ReplaceTextureState __state )
         {
             // Get the default texture names, because the ReplaceTexture method erases them with the new textures
             var renderers = trainCar.gameObject.GetComponentsInChildren<MeshRenderer>();
-            __state = renderers.ToDictionary(mr => mr, mr => GetDefaultTexInfo(mr));
+            __state = new ReplaceTextureState(renderers.ToDictionary(mr => mr, mr => GetDefaultTexInfo(mr)));
+
+            var currentScheme = NumberManager.GetScheme(trainCar);
+            if (currentScheme != null)
+            {
+                __state.HadAppliedScheme = true;
+
+                int currentNumber = NumberManager.GetCurrentCarNumber(trainCar);
+                int carId = NumberManager.GetCarIdNumber(trainCar.ID);
+                __state.WasOffsetNumber = (currentScheme.Offset + carId) == currentNumber;
+            }
+            else
+            {
+                __state.WasOffsetNumber = NumberManager.Settings.AllowCarIdOffset;
+            }
         }
 
-        static void Postfix( TrainCar trainCar, Dictionary<MeshRenderer, DefaultTexInfo> __state )
+        static void Postfix( TrainCar trainCar, ReplaceTextureState __state )
         {
-            int number = NumberManager.GetCurrentCarNumber(trainCar);
-            NumberManager.ApplyNumbering(trainCar, number, __state);
+            int number;
+            if (CarTypes.IsTender(trainCar.carLivery) && NumberManager.LastSteamerNumber.HasValue)
+            {
+                number = NumberManager.LastSteamerNumber.Value;
+            }
+            else if (__state.WasOffsetNumber)
+            {
+                number = NumberManager.GetCarIdNumber(trainCar.ID);
+                if ((NumberManager.GetScheme(trainCar) is NumberConfig currentScheme) && NumberManager.Settings.AllowCarIdOffset)
+                {
+                    number += currentScheme.Offset;
+                }
+            }
+            else
+            {
+                number = NumberManager.GetCurrentCarNumber(trainCar);
+            }
+            NumberManager.ApplyNumbering(trainCar, number, __state.DefaultTextureInfo);
+        }
+
+        public class ReplaceTextureState
+        {
+            public Dictionary<MeshRenderer, DefaultTexInfo> DefaultTextureInfo;
+            public bool HadAppliedScheme = false;
+            public bool WasOffsetNumber = false;
+
+            public ReplaceTextureState(Dictionary<MeshRenderer, DefaultTexInfo> defaultTextureInfo)
+            {
+                DefaultTextureInfo = defaultTextureInfo;
+            }
         }
     }
 

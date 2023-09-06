@@ -324,7 +324,7 @@ namespace NumberManager.Mod
 
         #region Number Application
 
-        private static int GetCarIdNumber( string carId )
+        public static int GetCarIdNumber( string carId )
         {
             string idNum = carId.Substring(carId.Length - 3);
             return int.Parse(idNum);
@@ -333,6 +333,14 @@ namespace NumberManager.Mod
         public static void SetCarNumber(string carGUID, int number)
         {
             SavedCarNumbers[carGUID] = number;
+        }
+
+        public static void RemoveCarNumber(string carGUID)
+        {
+            if (SavedCarNumbers.ContainsKey(carGUID))
+            {
+                SavedCarNumbers.Remove(carGUID);
+            }
         }
 
         public static int GetCurrentCarNumber(TrainCar car)
@@ -390,8 +398,8 @@ namespace NumberManager.Mod
         /// </summary>
         public static void ApplyNumbering(TrainCar car, int number)
         {
-            SkinManager_ReplaceTexture_Patch.Prefix(car, out Dictionary<MeshRenderer, DefaultTexInfo> texDict);
-            ApplyNumbering(car, number, texDict);
+            SkinManager_ReplaceTexture_Patch.Prefix(car, out SkinManager_ReplaceTexture_Patch.ReplaceTextureState texDict);
+            ApplyNumbering(car, number, texDict.DefaultTextureInfo);
         }
 
         /// <summary>
@@ -411,6 +419,8 @@ namespace NumberManager.Mod
             if( (numScheme == null) || (NumShader == null) )
             {
                 // nothing to apply
+                RemoveCarNumber(car.CarGUID);
+
                 foreach( var renderer in car.gameObject.GetComponentsInChildren<MeshRenderer>() )
                 {
                     if( !renderer.material.HasProperty("_MainTex") ) continue;
