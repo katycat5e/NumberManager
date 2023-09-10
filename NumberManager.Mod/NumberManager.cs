@@ -272,7 +272,7 @@ namespace NumberManager.Mod
             {
                 foreach (MeshRenderer renderer in carPrefabObj.GetComponentsInChildren<MeshRenderer>(true))
                 {
-                    if (renderer.material.HasProperty("_MainTex") && (renderer.material.GetTexture("_MainTex") is Texture2D mainTex))
+                    if ((renderer.material.shader.name == "Standard") && renderer.material.HasProperty("_MainTex") && (renderer.material.GetTexture("_MainTex") is Texture2D mainTex))
                     {
                         string shaderKey = GetDefaultShaderKey(carType, mainTex.name);
                         if (!DefaultShaders.ContainsKey(shaderKey))
