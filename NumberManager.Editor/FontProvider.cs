@@ -301,7 +301,8 @@ namespace NumberManager.Editor
             }
 
             int padding = Math.Max(Mathf.CeilToInt(PointSize / 15f * ATLAS_SUPER_SCALE), FONT_CHAR_PADDING);
-            int atlasDimension = (PointSize + padding) * 3 * ATLAS_SUPER_SCALE;
+            int atlasMultiplier = Mathf.CeilToInt(Mathf.Sqrt(extraChars.Length + 10));
+            int atlasDimension = (PointSize + padding) * atlasMultiplier * ATLAS_SUPER_SCALE;
 
             var tmpFont = TMP_FontAsset.CreateFontAsset(SourceFont, PointSize * ATLAS_SUPER_SCALE, padding, 
                 GlyphRenderMode.SDFAA_HINTED, atlasDimension, atlasDimension,
