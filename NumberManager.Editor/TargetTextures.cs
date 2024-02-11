@@ -30,6 +30,7 @@ namespace NumberManager.Editor
             "LocoDE6_Body_01d",
             "LocoDH4_ExteriorBody_01d",
             "LocoDM3_Body_01d",
+            "LocoMicroshunter_Body_01d",
 
             "CarFlatcarCBBulkheadStakes_Brown_d",
             "CarFlatcarCBBulkheadStakes_Brown_d",
@@ -84,6 +85,7 @@ namespace NumberManager.Editor
         DE6Slug,
         DH4,
         DM3,
+        Microshunter,
 
         FlatbedEmpty,
         FlatbedStakes,
