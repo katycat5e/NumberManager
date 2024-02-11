@@ -28,6 +28,7 @@
     <Reference Include="UnityEngine.CoreModule" />
     <Reference Include="UnityEngine.ImageConversionModule" />
     <Reference Include="UnityEngine.PhysicsModule" />
+    <Reference Include="Unity.TextMeshPro" />
     <Reference Include="UnityModManager" />
   </ItemGroup>
   
