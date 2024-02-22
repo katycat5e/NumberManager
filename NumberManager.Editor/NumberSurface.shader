@@ -77,11 +77,15 @@
 
             //spec = half4(GammaToLinearSpace( spec ), spec.a);
 
+            // newX = (x % 1) + 1 - ((x >= 0) ? 1 : 0)
+            // newX = (x % 1) + ((x < 0) ? 1 : 0)
+            float2 mainTileUV = frac(IN.uv_MainTex) + 1 - step(0, IN.uv_MainTex);
+
             [unroll( MAX_DIGITS )]
             for( int i = 0; i < _NDigits; i++ )
             {
                 // vector (bottomLeft -> input.uv, topRight -> input.uv)
-                float4 vComp = IN.uv_MainTex.xyxy - _DigitBounds[i];
+                float4 vComp = mainTileUV.xyxy - _DigitBounds[i];
                 float4 vTest = sign( vComp );
 
                 if( (vTest.x + vTest.y > 0) && (vTest.z + vTest.w < 0) )
