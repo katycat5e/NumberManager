@@ -114,7 +114,7 @@ namespace NumberManager.Mod
         private static void ReloadConfigs(bool reapply)
         {
             LoadSchemes();
-            LoadDefaultSchemes();
+            //LoadDefaultSchemes();
             if (reapply) ReapplyNumbers();
         }
 
@@ -154,10 +154,11 @@ namespace NumberManager.Mod
             if (!CarSpawner.Instance) return;
             foreach (var car in CarSpawner.Instance.AllCars)
             {
-                if (SkinManager.GetCurrentCarSkin(car, false) is Skin currentSkin)
+                (string? exterior, _) = SkinManager.GetCurrentCarSkin(car, false);
+                if (exterior is string currentSkin)
                 {
                     // do the livery check against the skin in case it's a DE6 skin on Slug etc
-                    if ((currentSkin.LiveryId == config.LiveryId) && (currentSkin.Name == config.SkinName))
+                    if ((car.carLivery.id == config.LiveryId) && (currentSkin == config.SkinName))
                     {
                         int num = GetCurrentCarNumber(car);
                         ApplyNumbering(car, num);
@@ -181,31 +182,31 @@ namespace NumberManager.Mod
             }
         }
 
-        private static void LoadDefaultSchemes()
-        {
-            const string DEFAULT_NUM_FOLDER = "defaults";
+        //private static void LoadDefaultSchemes()
+        //{
+        //    const string DEFAULT_NUM_FOLDER = "defaults";
 
-            foreach (var livery in Globals.G.Types.Liveries)
-            {
-                var defaultSkin = SkinProvider.GetDefaultSkin(livery.id);
-                string defaultFolder = Path.Combine(modEntry.Path, DEFAULT_NUM_FOLDER, livery.id);
+        //    foreach (var livery in Globals.G.Types.Liveries)
+        //    {
+        //        var defaultSkin = SkinProvider.GetDefaultSkin(livery.id);
+        //        string defaultFolder = Path.Combine(modEntry.Path, DEFAULT_NUM_FOLDER, livery.id);
 
-                if ((defaultSkin != null) && Directory.Exists(defaultFolder))
-                {
-                    var scheme = LoadSchemeFromSkin(livery, defaultSkin, defaultFolder);
-                    if (scheme != null)
-                    {
-                        scheme.IsDefault = true;
-                        //DefaultSchemes.Add(scheme);
-                    }
-                }
-            }
+        //        if ((defaultSkin != null) && Directory.Exists(defaultFolder))
+        //        {
+        //            var scheme = LoadSchemeFromSkin(livery, defaultSkin, defaultFolder);
+        //            if (scheme != null)
+        //            {
+        //                scheme.IsDefault = true;
+        //                //DefaultSchemes.Add(scheme);
+        //            }
+        //        }
+        //    }
 
-            if (!Settings.EnableDefaultNumbers)
-            {
-                SetDefaultSchemesEnabled(false, false);
-            }
-        }
+        //    if (!Settings.EnableDefaultNumbers)
+        //    {
+        //        SetDefaultSchemesEnabled(false, false);
+        //    }
+        //}
 
         private static bool _defaultsAreEnabled = false;
         private static void SetDefaultSchemesEnabled(bool enabled, bool reapply = true)
@@ -374,12 +375,12 @@ namespace NumberManager.Mod
 
         public static NumberConfig? GetScheme(TrainCar car)
         {
-            var skin = SkinManager.GetCurrentCarSkin(car);
-            if (skin == null)
+            (string? exterior, _) = SkinManager.GetCurrentCarSkin(car);
+            if (exterior is null)
             {
                 return null;
             }
-            return GetScheme(car.carLivery, skin.Name);
+            return GetScheme(car.carLivery, exterior);
         }
 
         public static NumberConfig? GetScheme(TrainCarLivery carType, string skinName)
@@ -398,7 +399,7 @@ namespace NumberManager.Mod
         /// </summary>
         public static void ApplyNumbering(TrainCar car, int number)
         {
-            SkinManager_ReplaceTexture_Patch.Prefix(car, out SkinManager_ReplaceTexture_Patch.ReplaceTextureState texDict);
+            SkinManager_ReplaceTexture_Patch.GetTextureState(car, out SkinManager_ReplaceTexture_Patch.ReplaceTextureState texDict);
             ApplyNumbering(car, number, texDict.DefaultTextureInfo);
         }
 

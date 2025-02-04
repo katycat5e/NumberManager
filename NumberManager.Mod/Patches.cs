@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using DV.Customization.Paint;
 using DV.ThingTypes;
 using HarmonyLib;
 using Newtonsoft.Json.Linq;
@@ -24,7 +25,7 @@ namespace NumberManager.Mod
         }
     }
 
-    [HarmonyPatch(typeof(SkinManager), nameof(SkinManager.ApplySkin), typeof(TrainCar), typeof(Skin))]
+    [HarmonyPatch(typeof(TrainCarPaint), nameof(TrainCarPaint.CurrentTheme), MethodType.Setter)]
     class SkinManager_ReplaceTexture_Patch
     {
         private static DefaultTexInfo GetDefaultTexInfo( MeshRenderer renderer )
@@ -38,7 +39,19 @@ namespace NumberManager.Mod
             else return new DefaultTexInfo(null, 0, 0);
         }
 
-        internal static void Prefix( TrainCar trainCar, out ReplaceTextureState __state )
+        internal static void Prefix(TrainCarPaint __instance, out ReplaceTextureState? __state)
+        {
+            if (__instance.TargetArea != TrainCarPaint.Target.Exterior)
+            {
+                __state = null;
+                return;
+            }
+
+            var trainCar = TrainCar.Resolve(__instance.gameObject);
+            GetTextureState(trainCar, out __state);
+        }
+
+        internal static void GetTextureState(TrainCar trainCar, out ReplaceTextureState __state)
         {
             // Get the default texture names, because the ReplaceTexture method erases them with the new textures
             var renderers = trainCar.gameObject.GetComponentsInChildren<MeshRenderer>();
@@ -59,8 +72,11 @@ namespace NumberManager.Mod
             }
         }
 
-        static void Postfix( TrainCar trainCar, ReplaceTextureState __state )
+        static void Postfix(TrainCarPaint __instance, ReplaceTextureState? __state)
         {
+            if (__state is null) return;
+            var trainCar = TrainCar.Resolve(__instance.gameObject);
+
             int number;
             if (CarTypes.IsTender(trainCar.carLivery) && NumberManager.LastSteamerNumber.HasValue)
             {
