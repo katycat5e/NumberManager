@@ -1,34 +1,17 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using DV.Customization.Paint;
+﻿using DV.Customization.Paint;
 using DV.ThingTypes;
 using HarmonyLib;
 using Newtonsoft.Json.Linq;
 using NumberManager.Shared;
-using SkinManagerMod;
-using UnityEngine;
 
 namespace NumberManager.Mod
 {
-    public struct DefaultTexInfo
+    [HarmonyPatch(typeof(TrainCarPaint))]
+    internal static class TrainCarPaintPatches
     {
-        public readonly string? Name;
-        public readonly int Width;
-        public readonly int Height;
-
-        public DefaultTexInfo( string? name, int width, int height )
-        {
-            Name = name;
-            Width = width;
-            Height = height;
-        }
-    }
-
-    [HarmonyPatch(typeof(TrainCarPaint), nameof(TrainCarPaint.CurrentTheme), MethodType.Setter)]
-    class SkinManager_ReplaceTexture_Patch
-    {
-        internal static void Prefix(TrainCarPaint __instance, out ReplaceTextureState? __state)
+        [HarmonyPatch(nameof(TrainCarPaint.CurrentTheme), MethodType.Setter)]
+        [HarmonyPrefix]
+        static void BeforeThemeChanged(TrainCarPaint __instance, out ReplaceTextureState? __state)
         {
             if (__instance.TargetArea != TrainCarPaint.Target.Exterior)
             {
@@ -37,11 +20,12 @@ namespace NumberManager.Mod
             }
 
             var trainCar = TrainCar.Resolve(__instance.gameObject);
-            GetTextureState(trainCar, out __state);
-        }
+            if (trainCar.logicCar is null)
+            {
+                __state = null;
+                return;
+            }
 
-        internal static void GetTextureState(TrainCar trainCar, out ReplaceTextureState __state)
-        {
             __state = new ReplaceTextureState();
 
             var currentScheme = NumberManager.GetScheme(trainCar);
@@ -59,10 +43,14 @@ namespace NumberManager.Mod
             }
         }
 
-        static void Postfix(TrainCarPaint __instance, ReplaceTextureState? __state)
+        [HarmonyPatch(nameof(TrainCarPaint.CurrentTheme), MethodType.Setter)]
+        [HarmonyPostfix]
+        static void AfterThemeChanged(TrainCarPaint __instance, ReplaceTextureState? __state)
         {
             if (__state is null) return;
+            
             var trainCar = TrainCar.Resolve(__instance.gameObject);
+            if (trainCar.logicCar is null) return;
 
             int number;
             if (CarTypes.IsTender(trainCar.carLivery) && NumberManager.LastSteamerNumber.HasValue)
@@ -91,21 +79,36 @@ namespace NumberManager.Mod
         }
     }
 
-    [HarmonyPatch(typeof(SaveGameManager), "Save")]
-    class SaveGameManager_Save_Patch
+    [HarmonyPatch(typeof(TrainCar))]
+    internal static class TrainCarPatches
     {
-        static void Prefix( SaveGameManager __instance )
+        [HarmonyPatch(nameof(TrainCar.ReturnCarToPool))]
+        [HarmonyPrefix]
+        static void OnReturnToPool(TrainCar __instance)
+        {
+            NumberManager.RemoveCarNumber(__instance.CarGUID);
+        }
+    }
+
+    [HarmonyPatch(typeof(SaveGameManager))]
+    internal static class SaveGameManagerPatches
+    {
+        [HarmonyPatch(nameof(SaveGameManager.Save))]
+        [HarmonyPrefix]
+        static void OnSave()
         {
             NumberManager.SaveData();
         }
     }
 
-    [HarmonyPatch(typeof(CarsSaveManager), "Load")]
-    class CarsSaveManager_Load_Patch
+    [HarmonyPatch(typeof(CarsSaveManager))]
+    internal static class CarsSaveManagerPatches
     {
-        static void Prefix( JObject savedData )
+        [HarmonyPatch(nameof(CarsSaveManager.Load))]
+        [HarmonyPrefix]
+        static void BeforeLoad(JObject savedData)
         {
-            if( savedData == null ) return;
+            if (savedData == null) return;
 
             NumberManager.LoadSaveData();
         }
