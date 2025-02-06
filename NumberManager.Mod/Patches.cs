@@ -28,17 +28,6 @@ namespace NumberManager.Mod
     [HarmonyPatch(typeof(TrainCarPaint), nameof(TrainCarPaint.CurrentTheme), MethodType.Setter)]
     class SkinManager_ReplaceTexture_Patch
     {
-        private static DefaultTexInfo GetDefaultTexInfo( MeshRenderer renderer )
-        {
-            //var mainTex = renderer.material.GetTexture("_MainTex");
-
-            if( renderer.material.HasProperty("_MainTex") && (renderer.material.GetTexture("_MainTex") is Texture mainTex) )
-            {
-                return new DefaultTexInfo(mainTex.name, mainTex.width, mainTex.height);
-            }
-            else return new DefaultTexInfo(null, 0, 0);
-        }
-
         internal static void Prefix(TrainCarPaint __instance, out ReplaceTextureState? __state)
         {
             if (__instance.TargetArea != TrainCarPaint.Target.Exterior)
@@ -53,9 +42,7 @@ namespace NumberManager.Mod
 
         internal static void GetTextureState(TrainCar trainCar, out ReplaceTextureState __state)
         {
-            // Get the default texture names, because the ReplaceTexture method erases them with the new textures
-            var renderers = trainCar.gameObject.GetComponentsInChildren<MeshRenderer>();
-            __state = new ReplaceTextureState(renderers.ToDictionary(mr => mr, mr => GetDefaultTexInfo(mr)));
+            __state = new ReplaceTextureState();
 
             var currentScheme = NumberManager.GetScheme(trainCar);
             if (currentScheme != null)
@@ -94,19 +81,13 @@ namespace NumberManager.Mod
             {
                 number = NumberManager.GetCurrentCarNumber(trainCar);
             }
-            NumberManager.ApplyNumbering(trainCar, number, __state.DefaultTextureInfo);
+            NumberManager.ApplyNumbering(trainCar, number);
         }
 
         public class ReplaceTextureState
         {
-            public Dictionary<MeshRenderer, DefaultTexInfo> DefaultTextureInfo;
             public bool HadAppliedScheme = false;
             public bool WasOffsetNumber = false;
-
-            public ReplaceTextureState(Dictionary<MeshRenderer, DefaultTexInfo> defaultTextureInfo)
-            {
-                DefaultTextureInfo = defaultTextureInfo;
-            }
         }
     }
 

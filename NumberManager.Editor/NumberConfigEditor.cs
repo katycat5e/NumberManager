@@ -144,7 +144,7 @@ namespace NumberManager.Editor
                     var props = ShaderPropBuilder.GetShaderProps(_numberConfig, DisplayNumber, tgtTex.width, tgtTex.height, Debug.LogWarning);
                     if (props != null)
                     {
-                        TargetRenderer.sharedMaterial.SetTexture("_FontTex", _numberConfig.FontTexture);
+                        TargetRenderer.sharedMaterial.SetTexture(NumShaderProps.ID_FONT_TEXTURE, _numberConfig.FontTexture);
                         props.ApplyTo(TargetRenderer.sharedMaterial);
                     }
                 }

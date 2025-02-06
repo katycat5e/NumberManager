@@ -394,19 +394,7 @@ namespace NumberManager.Mod
             return null;
         }
 
-        /// <summary>
-        /// Apply a new number to a car
-        /// </summary>
-        public static void ApplyNumbering(TrainCar car, int number)
-        {
-            SkinManager_ReplaceTexture_Patch.GetTextureState(car, out SkinManager_ReplaceTexture_Patch.ReplaceTextureState texDict);
-            ApplyNumbering(car, number, texDict.DefaultTextureInfo);
-        }
-
-        /// <summary>
-        /// Set number with default texture data (for internal use)
-        /// </summary>
-        internal static void ApplyNumbering(TrainCar car, int number, Dictionary<MeshRenderer, DefaultTexInfo> defaultTexDict)
+        internal static void ApplyNumbering(TrainCar car, int number)
         {
             var numScheme = GetScheme(car);
 
@@ -417,28 +405,29 @@ namespace NumberManager.Mod
                 NumShader = NumberingBundle.LoadAsset<Shader>(NUM_SHADER_PATH);
             }
 
-            if( (numScheme == null) || (NumShader == null) )
+            modEntry.Logger.Log($"Applying number {number} to {car.ID}");
+            var materialData = CarMaterialData.GetDataForCar(car.carLivery.id);
+
+            if ((numScheme == null) || (NumShader == null))
             {
                 // nothing to apply
                 RemoveCarNumber(car.CarGUID);
 
-                foreach( var renderer in car.gameObject.GetComponentsInChildren<MeshRenderer>() )
+                foreach (var renderer in car.gameObject.GetComponentsInChildren<MeshRenderer>())
                 {
-                    if( !renderer.material.HasProperty("_MainTex") ) continue;
+                    if (!renderer.material.HasProperty(TextureUtility.PropNames.Main)) continue;
 
-                    string? texName = renderer.material.GetTexture("_MainTex")?.name;
+                    string? texName = renderer.material.mainTexture?.name;
                     if (string.IsNullOrEmpty(texName)) continue;
 
-                    string shaderKey = GetDefaultShaderKey(car.carLivery, texName!);
-                    if (DefaultShaders.TryGetValue(shaderKey, out Shader defShader) )
+                    if (materialData.GetDataForMaterial(renderer.material.name, out var defaultMaterial))
                     {
-                        renderer.material.shader = defShader;
+                        renderer.material.shader = defaultMaterial!.Material.shader;
                     }
                 }
                 return;
             }
 
-            modEntry.Logger.Log($"Applying number {number} to {car.ID}");
             SetCarNumber(car.CarGUID, number);
 
             if (CarTypes.IsSteamLocomotive(car.carLivery))
@@ -465,17 +454,20 @@ namespace NumberManager.Mod
 
             foreach (var renderer in renderers)
             {
-                if (!renderer.material) continue;
+                if (!renderer.material || !renderer.material.HasProperty(TextureUtility.PropNames.Main)) continue;
 
-                DefaultTexInfo defaultTex = defaultTexDict[renderer];
+                var defaultMaterial = materialData.GetDataForMaterial(renderer.material);
+                var defaultTex = defaultMaterial?.Material.GetTexture(TextureUtility.PropNames.Main);
+
+                if (!defaultTex) continue;
 
                 // check if this is the target for numbering
-                if (string.Equals(numScheme.TargetTexture, defaultTex.Name))
+                if (string.Equals(numScheme.TargetTexture, defaultTex!.name))
                 {
-                    shaderProps ??= ShaderPropBuilder.GetShaderProps(numScheme, number, defaultTex.Width, defaultTex.Height, modEntry.Logger.Warning);
+                    shaderProps ??= ShaderPropBuilder.GetShaderProps(numScheme, number, defaultTex.width, defaultTex.height, modEntry.Logger.Warning);
 
                     renderer.material.shader = NumShader;
-                    renderer.material.SetTexture("_FontTex", numScheme.FontTexture);
+                    renderer.material.SetTexture(NumShaderProps.ID_FONT_TEXTURE, numScheme.FontTexture);
 
                     shaderProps.ApplyTo(renderer.material);
                 }
